@@ -1,0 +1,62 @@
+COMMAND: l <pin>
+EXPECTED OUTPUT:
+	- <pin> <lname> <fname> <zip> <status>
+ERROR INDICATIONS:
+	- "Participant <pin> not in cohort"
+        - "Malformed Pin" if <pin> not an int
+
+COMMAND: i <pin> <lname> <fname> <zip>
+EXPECTED OUTPUT:
+	- "Inserted <pin> <lname> <fname> <zip> <status>"
+ERROR INDICATIONS:
+	- "<pin> already exist"
+        - "Malformed Input" if <pin>|<lname>|<fname>|<zip>  are not valid
+
+COMMAND: m <pin>
+EXPECTED OUTPUT:
+	- "|pin| Marked Voted"
+SERROR INDICATION:
+	- "<pin> does not exist"
+        - "Malformed Input" if <pin> not an int
+
+COMMAND: bv <fileofkeys>
+EXPECTED OUTPUT:
+	- "<pin> Marked Voted" for each element in <fileofkeys>
+ERROR INDICATION:
+	- "<pin> does not exist"
+        - "Malformed Input" if <pin> not an int
+        - <fileofkeys> could not be opened, if it does not exit.
+
+COMMAND: v
+EXPECTED OUTPUT:
+	- "Voted So Far <n>" where <n> is the sum of voted partcipants.
+ERROR INDICATION:
+	- none
+
+COMMAND: perc
+EXPECTED OUTPUT:
+	- <avg_participants>
+ERROR INDICATION:
+	- none
+
+COMMAND:  z <zipcode>
+EXPECTED OUTPUT:
+	- "<number> voted  in  <zipcode>"
+          "<pin>"
+          "<pin>"
+          "<pin>"
+           ....
+ERROR INDICATION:
+	- none
+
+COMMAND: o
+EXPECTED OUTPUT:
+	- "<zipcode> <num>" for every zipcode in descending order
+ERROR INDICATION:
+
+COMMAND: exit
+EXPECTED OUTPUT:
+	- "<num> of Bytes Released" where <num> is the sum toal number
+                of Bytes freed up.
+ERROR INDICATION:
+	- none

@@ -1,0 +1,15 @@
+CORRECT
+
+./mvote -f voters50.csv -b 3
+
+./mvote -b 6 -f voters500.csv
+
+WRONG
+
+./mvote -f 4 -b 3
+
+./mvote -f de -b -1
+
+./mvote -b voters.cvs -f 6
+
+./mvote -6 7 -f d
