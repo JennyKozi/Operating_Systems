@@ -11,14 +11,15 @@
 
 int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 
-	// HTptr *table_entries;
 	Listptr list_voted;
+	HTptr table_voters;
 	FILE *fp, *fileofkeys;
+	Voter *voter;
 	int bucketentries, i, pin, zip, key, argv_file, argv_buck, count_voted;
 	float percent;
 	char *lname, *fname, *input, *command;
 
-	// Check argument values
+	// Check for errors
 	if (argc < 5) {
 		printf("Not enough arguments!\n");
 		exit(1);
@@ -33,6 +34,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 		exit(1);
 	}
 
+	// Take values from flags
 	if (strcmp(argv[1], "-f") == 0) {
 		argv_file = 2;
 		argv_buck = 4;
@@ -62,38 +64,54 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	// Create buffers for scanf
 	command = malloc(N * sizeof(char));
 	input = malloc(SIZE * sizeof(char));
-	if (command == NULL || input == NULL){
+	if (command == NULL || input == NULL) {
 		printf("Cannot allocate memory!\n");
 		exit(1);
 	}
 
 	// Create hash table
-
+	Create_HT(&table_voters, bucketentries);
 
 	// Create 2d list
 	Create_List(&list_voted);
 
+	// Read the voters from the file
+	while (fscanf(fp, "%d", &pin) == 1) {
+		voter = malloc(sizeof(Voter));
+		if (voter == NULL) {
+			printf("Cannot allocate memory!\n");
+			exit(1);
+		}
+		voter->has_voted = 'N'; // they haven't voted
+		voter->PIN = pin; // we have scanned their unique pin
+		fscanf(fp, "%s", input); // scan first name
+		voter->first_name = input;
+		fscanf(fp, "%s", input); // scan last name
+		voter->last_name = input;
+		fscanf(fp, "%d", &zip); // scan zipcode
+		voter->zipcode = zip;
+		Insert_HT(table_voters, voter); // Insert voter in hash table
+	}
+	fclose(fp);
+
+	printf("Insert command:\n");
+
 	// Commands to mvote from command line
 	while (1) {
 		scanf("%s", command);
-		printf("\n");
 
 		// Case 1
 		if (strcmp(command, "l") == 0) {
 			scanf("%d", &pin);
-//			printf("pin: %d", pin);
-//			printf("\nCase1 done\n");
+			printf("%d\n\n", Search_HT(table_voters, pin));
 		}
 
 		// Case 2
 		else if (strcmp(command, "i") == 0) {
 			scanf("%d", &pin);
 			scanf("%s", input); // lname
-//			printf("pin: %d, lname: %s", pin, input);
 			scanf("%s", input); // fname
 			scanf("%d", &zip);
-//			printf("fname: %s, zip: %d", input, zip);
-//			printf("\nCase2 done\n");
 		}
 
 		// Case 3
@@ -111,10 +129,9 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
     			break;
     		}
 			while (fscanf(fileofkeys, "%d", &key) == 1) {
-//				printf("%d ", key);
+
 			}
 			fclose(fileofkeys);
-//			printf("\nCase4 done\n");
 		}
 
 		// Case 5
@@ -123,19 +140,18 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			printf("Voted So Far: %d\n", Size_List(list_voted));
 		}
 
-		// Case 6
+		// Case 6: find the percent
 		else if (strcmp(command, "perc") == 0) {
-			// Find the percent
 			//total = 
 			count_voted =  Size_List(list_voted);
-			//percent = float(count_voted) / float(total);
+			//percent = ((float)count_voted) / total;
 			printf("%2.4f\n", percent);
 		}
 
 		// Case 7
 		else if (strcmp(command, "z") == 0) {
 			scanf("%d", &zip);
-//			printf("pin: %d", zip);
+
 		}
 
 		// Case 8
@@ -148,12 +164,17 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			printf("Exiting the program! Goodbye!\n");
 			break;
 		}
+
+		// Wrong command
+		else {
+			printf("Command not found!\n\n");
+		}
 	}
 
 	// Free memory
-	fclose(fp);
 	free(command);
 	free(input);
+	Delete_HT(&table_voters);
 	Delete_List(&list_voted);
 
 	return 0;

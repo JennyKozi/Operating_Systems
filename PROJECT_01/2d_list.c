@@ -3,8 +3,7 @@
 #include "voter.h"
 #include "2d_list.h"
 
-// Functions for 2d list
-
+// Create 2d_list
 void Create_List(Listptr *list) {
 
 	(*list) = malloc(sizeof(ListNode_2d));
@@ -42,7 +41,7 @@ int Size_List(Listptr list) {
 	return count;
 }
 
-// Free memory
+// Delete 2d list, free memory
 void Delete_List(Listptr *list) {
 	Listptr temp_node;
 	ListNode *temp_voter;

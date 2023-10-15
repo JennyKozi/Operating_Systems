@@ -4,6 +4,17 @@ CORRECT
 
 ./mvote -b 6 -f voters500.csv
 
+GDB
+
+gdb ./mvote
+run -f voters50.csv -b 3
+backtrace
+backtrace full
+
+VALGRIND
+
+valgrind --leak-check=yes ./mvote -f voters50.csv -b 3
+
 WRONG
 
 ./mvote -f 4 -b 3
