@@ -38,6 +38,11 @@ void Create_HT(HTptr *ht, int num_entries) {
 static void Initialize_Bucket(Bucket **bucket, int size) {
 	int i;
 
+	(*bucket) = malloc(sizeof(Bucket));
+	if ((*bucket) == NULL) {
+		printf("Cannot allocate memory!\n");
+		exit(1);
+	}
 	(*bucket)->next_bucket = NULL;
 	(*bucket)->voters = malloc(size * sizeof(Voter *));
 	if ((*bucket)->voters == NULL) {
@@ -56,11 +61,6 @@ static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
 
 	// Create a bucket
 	if ((*bucket) == NULL) {
-		(*bucket) = malloc(sizeof(Bucket));
-		if ((*bucket) == NULL) {
-			printf("Cannot allocate memory!\n");
-			exit(1);
-		}
 		Initialize_Bucket(bucket, size);
 	}
 	
@@ -105,13 +105,8 @@ void Insert_HT(HTptr ht, Voter *voter) {
 static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 	int i;
 	Bucket *curr_bucket = (*b1);
-	Bucket *temp_bucket;
+	Bucket *new_bucket, *temp_bucket;
 
-	Bucket *new_bucket = malloc(sizeof(Bucket));
-	if (new_bucket == NULL) {
-		printf("Cannot allocate memory!\n");
-		exit(1);
-	}
 	Initialize_Bucket(&new_bucket, ht->bucketentries);
 
 	while (curr_bucket != NULL) {
@@ -140,23 +135,25 @@ int Search_HT(HTptr ht, int pin) {
 	Bucket *bucket1 = ht->buckets[i1];
 	Bucket *bucket2 = ht->buckets[i2];
 
+	// Search the first bucket
 	while (bucket1 != NULL) {
 		for (j = 0; j < bucket1->count; j++) {
 			if (bucket1->voters[j]->PIN == pin) {
-				return 1;
+				return 1; // Found pin
 			}
 		}
 		bucket1 = bucket1->next_bucket;
 	}
+	// Search the second bucket
 	while (bucket2 != NULL) {
 		for (j = 0; j < bucket2->count; j++) {
 			if (bucket2->voters[j]->PIN == pin) {
-				return 1;
+				return 1; // Found pin
 			}
 		}
 		bucket2 = bucket2->next_bucket;
 	}
-
+	// Pin was not found
 	return 0;
 }
 

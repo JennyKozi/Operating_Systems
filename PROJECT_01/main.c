@@ -38,7 +38,6 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	if (strcmp(argv[1], "-f") == 0) {
 		argv_file = 2;
 		argv_buck = 4;
-		
 	}
 	else {
 		argv_file = 4;
