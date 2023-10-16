@@ -20,5 +20,5 @@ typedef struct hash_table *HTptr;
 // Functions
 void Create_HT(HTptr *, int);
 void Insert_HT(HTptr, Voter *);
-int Search_HT(HTptr, int);
+Voter* Search_HT(HTptr, int);
 void Delete_HT(HTptr *);

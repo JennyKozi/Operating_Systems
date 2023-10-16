@@ -16,7 +16,7 @@ typedef struct node_2d *Listptr;
 // Functions
 void Create_List(Listptr *);
 int Size_List(Listptr);
+void Insert_List(Listptr *, Voter *);
 //void Print_Zip_List(Listptr, int);
 //int Search_Code_List(Listptr);
-//void Add_Voter_List(Listptr *);
 void Delete_List(Listptr *);

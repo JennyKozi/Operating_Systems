@@ -6,8 +6,18 @@
 #include "hash_table.h"
 #include "2d_list.h"
 
-#define N 5
-#define SIZE 100
+#define SIZE 40
+
+#define CHECK_MALLOC_NULL(p)  \
+if ((p) == NULL) {  \
+	printf("Cannot allocate memory!\n"); \
+	exit(1);  \
+};
+
+// Global variable to count bytes allocted
+int num_bytes = 0;
+
+int Check_Int(float);
 
 int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 
@@ -15,9 +25,9 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	HTptr table_voters;
 	FILE *fp, *fileofkeys;
 	Voter *voter;
-	int bucketentries, i, pin, zip, key, argv_file, argv_buck, count_voted;
-	float percent;
-	char *lname, *fname, *input, *command;
+	int bucketentries, i, pin, zip, key, argv_file, argv_buck, count_voted, flag = 0;
+	float percent, float_num;
+	char *input, *lname, *fname, *command;
 
 	// Check for errors
 	if (argc < 5) {
@@ -61,12 +71,10 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	bucketentries = atoi(argv[argv_buck]);
 
 	// Create buffers for scanf
-	command = malloc(N * sizeof(char));
-	input = malloc(SIZE * sizeof(char));
-	if (command == NULL || input == NULL) {
-		printf("Cannot allocate memory!\n");
-		exit(1);
-	}
+	CHECK_MALLOC_NULL(command = malloc(SIZE * sizeof(char)));
+	CHECK_MALLOC_NULL(input = malloc(SIZE * sizeof(char)));
+	CHECK_MALLOC_NULL(lname = malloc(SIZE * sizeof(char)));
+	CHECK_MALLOC_NULL(fname = malloc(SIZE * sizeof(char)));
 
 	// Create hash table
 	Create_HT(&table_voters, bucketentries);
@@ -76,19 +84,22 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 
 	// Read the voters from the file
 	while (fscanf(fp, "%d", &pin) == 1) {
-		voter = malloc(sizeof(Voter));
-		if (voter == NULL) {
-			printf("Cannot allocate memory!\n");
-			exit(1);
-		}
-		voter->has_voted = 'N'; // they haven't voted
-		voter->PIN = pin; // we have scanned their unique pin
-		fscanf(fp, "%s", input); // scan first name
-		voter->first_name = input;
-		fscanf(fp, "%s", input); // scan last name
-		voter->last_name = input;
-		fscanf(fp, "%d", &zip); // scan zipcode
+
+		fscanf(fp, "%s", fname); // Scan first name
+		fscanf(fp, "%s", lname); // Scan last name
+		fscanf(fp, "%d", &zip); // Scan zipcode
+		
+		// Create voter
+		CHECK_MALLOC_NULL(voter = malloc(sizeof(Voter)));
+		CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1));
+		CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1));
+
+		strcpy(voter->last_name, lname);
+		strcpy(voter->first_name, fname);
+		voter->has_voted = 'N'; // They haven't voted
+		voter->PIN = pin; // We have scanned their unique pin
 		voter->zipcode = zip;
+
 		Insert_HT(table_voters, voter); // Insert voter in hash table
 	}
 	fclose(fp);
@@ -99,33 +110,121 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	while (1) {
 		scanf("%s", command);
 
-		// Case 1
+		// CASE 1
 		if (strcmp(command, "l") == 0) {
-			scanf("%d", &pin);
-			printf("%d\n\n", Search_HT(table_voters, pin));
+
+			// Check if pin is int
+			scanf("%f", &float_num);
+			if (Check_Int(float_num) == 0) {
+				printf("Malformed Pin\n\n");
+				continue;
+			}
+			pin = float_num;
+			
+			// Check if voter os in hash table
+			voter = Search_HT(table_voters, pin);
+			if (voter != NULL) {
+				printf("%d %s %s %d %c\n\n", voter->PIN, voter->last_name, voter->first_name, voter->zipcode, voter->has_voted);
+			}
+			else {
+				printf("Participant %d not in cohort\n\n", pin);
+			}
 		}
 
-		// Case 2
+		// CASE 2
 		else if (strcmp(command, "i") == 0) {
-			scanf("%d", &pin);
-			scanf("%s", input); // lname
-			scanf("%s", input); // fname
-			scanf("%d", &zip);
+
+			// Check if pin is int
+			scanf("%f", &float_num);
+			if (Check_Int(float_num) == 0) {
+				printf("Malformed Input\n\n");
+				continue;
+			}
+			pin = float_num;
+			
+			// Check if voter exists
+			voter = Search_HT(table_voters, pin);
+			if (voter != NULL) {
+				printf("%d already exists\n\n", pin);
+				continue;
+			}
+			// Last name must not contain numbers
+			scanf("%s", lname);
+			for (i = 0; i < strlen(lname); i++) {
+				if (isdigit(lname[i])) {
+					printf("Malformed Input\n\n");
+					flag = 1;
+					break;
+				}
+			}
+			if (flag == 1) {
+				flag = 0;
+				continue;
+			}
+			// First name must not contain numbers
+			scanf("%s", fname);
+			for (i = 0; i < strlen(fname); i++) {
+				if (isdigit(fname[i])) {
+					printf("Malformed Input\n\n");
+					flag = 1;
+					continue;
+				}
+			}
+			if (flag == 1) {
+				flag = 0;
+				continue;
+			}
+			// Zip must be an int
+			scanf("%f", &float_num);
+			if (Check_Int(float_num) == 0) {
+				printf("Malformed Input\n\n");
+				continue;
+			}
+			zip = float_num;
+			
+			// Create voter
+			CHECK_MALLOC_NULL(voter = malloc(sizeof(Voter)));
+			CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1));
+			CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1));
+
+			voter->has_voted = 'N'; // They haven't voted
+			voter->PIN = pin; // We have scanned their unique pin
+			strcpy(voter->last_name, lname);
+			strcpy(voter->first_name, fname);
+			voter->zipcode = zip;
+
+			Insert_HT(table_voters, voter); // Insert voter in hash table
+			printf("Inserted %d %s %s %d N\n\n", pin, lname, fname, zip);
 		}
 
-		// Case 3
+		// CASE 3
 		else if (strcmp(command, "m") == 0) {
-			scanf("%d", &pin);
-			printf("%d Market Voted", pin);
+			// Check if pin is int
+			scanf("%f", &float_num);
+			if (Check_Int(float_num) == 0) {
+				printf("Malformed Input\n\n");
+				continue;
+			}
+			pin = float_num;
+			
+			// Check if voter exists
+			voter = Search_HT(table_voters, pin);
+			if (voter == NULL) {
+				printf("%d does not exist\n\n", pin);
+				continue;
+			}
+			voter->has_voted = 'Y';
+			printf("%d Marked Voted", pin);
+			
 		}
 
-		// Case 4
+		// CASE 4
 		else if (strcmp(command, "bv") == 0) {
 			scanf("%s", input); // file name
 			fileofkeys = fopen(input, "r");
 			if (!fileofkeys) {
-    			printf("Can't open file!\n");
-    			break;
+    			printf("%s could not be opened\n", input);
+    			continue;
     		}
 			while (fscanf(fileofkeys, "%d", &key) == 1) {
 
@@ -133,48 +232,56 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			fclose(fileofkeys);
 		}
 
-		// Case 5
+		// CASE 5
 		else if (strcmp(command, "v") == 0) {
 			// Return the size of the 2d list
 			printf("Voted So Far: %d\n", Size_List(list_voted));
 		}
 
-		// Case 6: find the percent
+		// CASE 6: find the percent
 		else if (strcmp(command, "perc") == 0) {
 			//total = 
 			count_voted =  Size_List(list_voted);
 			//percent = ((float)count_voted) / total;
-			printf("%2.4f\n", percent);
+			printf("%.4f\n", percent);
 		}
 
-		// Case 7
+		// CASE 7
 		else if (strcmp(command, "z") == 0) {
 			scanf("%d", &zip);
 
 		}
 
-		// Case 8
+		// CASE 8
 		else if (strcmp(command, "o") == 0) {
 
 		}
 
-		// Case 9
+		// CASE 9
 		else if (strcmp(command, "exit") == 0) {
-			printf("Exiting the program! Goodbye!\n");
+			printf(" of Bytes Released\n");
 			break;
-		}
-
-		// Wrong command
-		else {
-			printf("Command not found!\n\n");
 		}
 	}
 
 	// Free memory
 	free(command);
 	free(input);
+	free(lname);
+	free(fname);
 	Delete_HT(&table_voters);
 	Delete_List(&list_voted);
 
 	return 0;
+}
+
+// Functions
+int Check_Int(float float_num) {
+	int num = float_num;
+	float diff = float_num - (float)num;
+
+	if (diff != 0.0) {
+		return 0;
+	}
+	return 1;
 }

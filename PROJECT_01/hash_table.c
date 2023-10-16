@@ -3,8 +3,16 @@
 #include "voter.h"
 #include "hash_table.h"
 
-#define M 5
-#define L 0.75
+#define M 5 // Initial number of buckets for the hash table
+#define L 0.75 // Threshold
+
+#define CHECK_MALLOC_NULL(p)  \
+if ((p) == NULL) {  \
+	printf("Cannot allocate memory!\n"); \
+	exit(1);  \
+};
+
+extern int num_bytes;
 
 static void Initialize_Bucket(Bucket **, int);
 static void Insert_Bucket(Bucket **, Voter *, int);
@@ -14,62 +22,15 @@ static void Bucket_Split(HTptr ht, Bucket **, Bucket **);
 void Create_HT(HTptr *ht, int num_entries) {
 	int i;
 
-	(*ht) = malloc(sizeof(HT));
-	if ((*ht) == NULL) {
-		printf("Cannot allocate memory!\n");
-		exit(1);
-	}
+	CHECK_MALLOC_NULL((*ht) = malloc(sizeof(HT)));
 	(*ht)->m = M;
 	(*ht)->p = 0;
 	(*ht)->num_buckets = M;
 	(*ht)->num_keys = 0;
 	(*ht)->bucketentries = num_entries;
-	(*ht)->buckets = malloc(M * sizeof(Bucket *));
-	if ((*ht)->buckets == NULL) {
-		printf("Cannot allocate memory!\n");
-		exit(1);
-	}
+	CHECK_MALLOC_NULL((*ht)->buckets = malloc(M * sizeof(Bucket *)));
 	for (i = 0; i < M; i++) {
 		(*ht)->buckets[i] = NULL;
-	}
-}
-
-// Initialize an empty bucket
-static void Initialize_Bucket(Bucket **bucket, int size) {
-	int i;
-
-	(*bucket) = malloc(sizeof(Bucket));
-	if ((*bucket) == NULL) {
-		printf("Cannot allocate memory!\n");
-		exit(1);
-	}
-	(*bucket)->next_bucket = NULL;
-	(*bucket)->voters = malloc(size * sizeof(Voter *));
-	if ((*bucket)->voters == NULL) {
-		printf("Cannot allocate memory!\n");
-		exit(1);
-	}
-	(*bucket)->count = 0;
-	for (i = 0; i < size; i++) {
-		(*bucket)->voters[i] = NULL;
-	}
-}
-
-// Insert a voter into a bucket
-static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
-	int i = 0;
-
-	// Create a bucket
-	if ((*bucket) == NULL) {
-		Initialize_Bucket(bucket, size);
-	}
-	
-	if ((*bucket)->count == size) {
-		Insert_Bucket(&((*bucket)->next_bucket), voter, size); // Overflow bucket
-	}
-	else {
-		(*bucket)->voters[(*bucket)->count] = voter;
-		(*bucket)->count++;
 	}
 }
 
@@ -102,6 +63,37 @@ void Insert_HT(HTptr ht, Voter *voter) {
 	}
 }
 
+// Initialize an empty bucket
+static void Initialize_Bucket(Bucket **bucket, int size) {
+	int i;
+
+	CHECK_MALLOC_NULL((*bucket) = malloc(sizeof(Bucket)));
+	(*bucket)->next_bucket = NULL;
+	CHECK_MALLOC_NULL((*bucket)->voters = malloc(size * sizeof(Voter *)));
+	(*bucket)->count = 0;
+	for (i = 0; i < size; i++) {
+		(*bucket)->voters[i] = NULL;
+	}
+}
+
+// Insert a voter into a bucket
+static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
+	int i = 0;
+
+	// Create a bucket
+	if ((*bucket) == NULL) {
+		Initialize_Bucket(bucket, size);
+	}
+	if ((*bucket)->count == size) {
+		Insert_Bucket(&((*bucket)->next_bucket), voter, size); // Overflow bucket
+	}
+	else {
+		(*bucket)->voters[(*bucket)->count] = voter;
+		(*bucket)->count++;
+	}
+}
+
+// Splits a bucket into 2 buckets
 static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 	int i;
 	Bucket *curr_bucket = (*b1);
@@ -127,7 +119,7 @@ static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 }
 
 // Searches if there is a voter with a given PIN
-int Search_HT(HTptr ht, int pin) {
+Voter* Search_HT(HTptr ht, int pin) {
 
 	int j;
 	int i1 = pin % ht->m;
@@ -139,7 +131,7 @@ int Search_HT(HTptr ht, int pin) {
 	while (bucket1 != NULL) {
 		for (j = 0; j < bucket1->count; j++) {
 			if (bucket1->voters[j]->PIN == pin) {
-				return 1; // Found pin
+				return bucket1->voters[j]; // Found pin
 			}
 		}
 		bucket1 = bucket1->next_bucket;
@@ -148,13 +140,13 @@ int Search_HT(HTptr ht, int pin) {
 	while (bucket2 != NULL) {
 		for (j = 0; j < bucket2->count; j++) {
 			if (bucket2->voters[j]->PIN == pin) {
-				return 1; // Found pin
+				return bucket2->voters[j]; // Found pin
 			}
 		}
 		bucket2 = bucket2->next_bucket;
 	}
 	// Pin was not found
-	return 0;
+	return NULL;
 }
 
 // Delete hash table, free memory
@@ -168,6 +160,8 @@ void Delete_HT(HTptr *ht) {
 		bucket = array_buckets[i];
 		while (bucket != NULL) {
 			for (j = 0; j < bucket->count; j++) {
+				free(bucket->voters[j]->first_name);
+				free(bucket->voters[j]->last_name);
 				free(bucket->voters[j]);
 			}
 			free(bucket->voters);

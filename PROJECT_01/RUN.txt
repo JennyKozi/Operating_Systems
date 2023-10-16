@@ -13,7 +13,19 @@ backtrace full
 
 VALGRIND
 
-valgrind --leak-check=yes ./mvote -f voters50.csv -b 3
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./mvote -f voters50.csv -b 3
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./mvote -b 6 -f voters500.csv
+
+CASE 2
+
+i 8282 Kozi Jenny 11364
+i 56.8 Linkon James 23947
+i 3948 Jk3jk Penny 333
+i 4567 Doe John 44.45
+i 100065 Pitt Brad 84374
+
+CASE 3
+
 
 WRONG
 
