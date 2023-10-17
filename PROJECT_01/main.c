@@ -17,7 +17,8 @@ if ((p) == NULL) {  \
 // Global variable to count bytes allocted
 int num_bytes = 0;
 
-int Check_Int(float);
+int Check_Int(char *);
+int Check_String(char *);
 
 int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 
@@ -25,7 +26,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	HTptr table_voters;
 	FILE *fp, *fileofkeys;
 	Voter *voter;
-	int bucketentries, i, pin, zip, key, argv_file, argv_buck, count_voted, flag = 0;
+	int bucketentries, i, pin, zip, argv_file, argv_buck, count_voted, total;
 	float percent, float_num;
 	char *input, *lname, *fname, *command;
 
@@ -114,13 +115,13 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 		if (strcmp(command, "l") == 0) {
 
 			// Check if pin is int
-			scanf("%f", &float_num);
-			if (Check_Int(float_num) == 0) {
+			scanf("%s", input);
+			if (Check_Int(input) == 0) {
 				printf("Malformed Pin\n\n");
 				continue;
 			}
-			pin = float_num;
-			
+			pin = atoi(input);
+
 			// Check if voter os in hash table
 			voter = Search_HT(table_voters, pin);
 			if (voter != NULL) {
@@ -135,12 +136,12 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 		else if (strcmp(command, "i") == 0) {
 
 			// Check if pin is int
-			scanf("%f", &float_num);
-			if (Check_Int(float_num) == 0) {
+			scanf("%s", input);
+			if (Check_Int(input) == 0) {
 				printf("Malformed Input\n\n");
 				continue;
 			}
-			pin = float_num;
+			pin = atoi(input);
 			
 			// Check if voter exists
 			voter = Search_HT(table_voters, pin);
@@ -150,37 +151,23 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			}
 			// Last name must not contain numbers
 			scanf("%s", lname);
-			for (i = 0; i < strlen(lname); i++) {
-				if (isdigit(lname[i])) {
-					printf("Malformed Input\n\n");
-					flag = 1;
-					break;
-				}
-			}
-			if (flag == 1) {
-				flag = 0;
+			if (Check_String(lname) == 0) {
+				printf("Malformed Input\n\n");
 				continue;
 			}
 			// First name must not contain numbers
 			scanf("%s", fname);
-			for (i = 0; i < strlen(fname); i++) {
-				if (isdigit(fname[i])) {
-					printf("Malformed Input\n\n");
-					flag = 1;
-					continue;
-				}
-			}
-			if (flag == 1) {
-				flag = 0;
-				continue;
-			}
-			// Zip must be an int
-			scanf("%f", &float_num);
-			if (Check_Int(float_num) == 0) {
+			if (Check_String(fname) == 0) {
 				printf("Malformed Input\n\n");
 				continue;
 			}
-			zip = float_num;
+			// Zip must be an int
+			scanf("%s", input);
+			if (Check_Int(input) == 0) {
+				printf("Malformed Input\n\n");
+				continue;
+			}
+			zip = atoi(input);
 			
 			// Create voter
 			CHECK_MALLOC_NULL(voter = malloc(sizeof(Voter)));
@@ -199,13 +186,14 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 
 		// CASE 3
 		else if (strcmp(command, "m") == 0) {
+
 			// Check if pin is int
-			scanf("%f", &float_num);
-			if (Check_Int(float_num) == 0) {
+			scanf("%s", input);
+			if (Check_Int(input) == 0) {
 				printf("Malformed Input\n\n");
 				continue;
 			}
-			pin = float_num;
+			pin = atoi(input);
 			
 			// Check if voter exists
 			voter = Search_HT(table_voters, pin);
@@ -213,37 +201,65 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 				printf("%d does not exist\n\n", pin);
 				continue;
 			}
-			voter->has_voted = 'Y';
-			printf("%d Marked Voted", pin);
-			
+			if (voter->has_voted == 'Y') {
+				printf("%d Marked Voted\n", pin);
+			}
+			else {
+				voter->has_voted = 'Y';
+				printf("%d Marked Voted\n", pin);
+				Insert_List(&list_voted, voter);
+			}
 		}
 
 		// CASE 4
 		else if (strcmp(command, "bv") == 0) {
+
 			scanf("%s", input); // file name
 			fileofkeys = fopen(input, "r");
 			if (!fileofkeys) {
     			printf("%s could not be opened\n", input);
     			continue;
     		}
-			while (fscanf(fileofkeys, "%d", &key) == 1) {
+			// Read keys from file
+			while (fscanf(fileofkeys, "%s", input) == 1) {
+				// Pin must be int
+				if (Check_Int(input) == 0) {
+					printf("Malformed Input\n\n");
+					continue;
+				}
+				pin = atoi(input);
 
+				// Check if voter exists
+				voter = Search_HT(table_voters, pin);
+				if (voter == NULL) {
+					printf("%d does not exist\n\n", pin);
+					continue;
+				}
+				if (voter->has_voted == 'Y') {
+					printf("%d Marked Voted\n", pin);
+				}
+				else {
+					voter->has_voted = 'Y';
+					printf("%d Marked Voted\n", pin);
+					Insert_List(&list_voted, voter);
+				}
 			}
+			printf("\n");
 			fclose(fileofkeys);
 		}
 
 		// CASE 5
 		else if (strcmp(command, "v") == 0) {
 			// Return the size of the 2d list
-			printf("Voted So Far: %d\n", Size_List(list_voted));
+			printf("Voted So Far: %d\n\n", Size_List(list_voted));
 		}
 
 		// CASE 6: find the percent
 		else if (strcmp(command, "perc") == 0) {
-			//total = 
+			total = table_voters->num_keys;
 			count_voted =  Size_List(list_voted);
-			//percent = ((float)count_voted) / total;
-			printf("%.4f\n", percent);
+			percent = ((float)count_voted) / total;
+			printf("%.3f\n\n", percent);
 		}
 
 		// CASE 7
@@ -275,13 +291,34 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	return 0;
 }
 
-// Functions
-int Check_Int(float float_num) {
+// Check that it is an int
+int Check_Int(char *string) {
+
+	int i;
+	// Check for chars
+	for (i = 0; i < strlen(string); i++) {
+		if (isalpha(string[i])) {
+			return 0;
+		}
+	}
+	// Check if num is float
+	float float_num = atof(string);
 	int num = float_num;
 	float diff = float_num - (float)num;
 
 	if (diff != 0.0) {
 		return 0;
+	}
+	return 1;
+}
+
+// Check that string does not contain numbers
+int Check_String(char *string) {
+	int i;
+	for (i = 0; i < strlen(string); i++) {
+		if (isdigit(string[i])) {
+			return 0;
+		}
 	}
 	return 1;
 }

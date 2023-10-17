@@ -3,7 +3,7 @@
 #include "voter.h"
 #include "hash_table.h"
 
-#define M 5 // Initial number of buckets for the hash table
+#define M 4 // Initial number of buckets for the hash table
 #define L 0.75 // Threshold
 
 #define CHECK_MALLOC_NULL(p)  \
@@ -14,7 +14,6 @@ if ((p) == NULL) {  \
 
 extern int num_bytes;
 
-static void Initialize_Bucket(Bucket **, int);
 static void Insert_Bucket(Bucket **, Voter *, int);
 static void Bucket_Split(HTptr ht, Bucket **, Bucket **);
 
@@ -56,23 +55,10 @@ void Insert_HT(HTptr ht, Voter *voter) {
 		Bucket_Split(ht, &(ht->buckets[ht->p]), &(ht->buckets[ht->num_buckets - 1]));
 		ht->p++; // p points to the next bucket that will split
 		// Complete round
-		if (ht->p == 2 * ht->m) {
+		if (ht->p == ht->m) {
 			ht->m = 2 * ht->m;
 			ht->p = 0;
 		}
-	}
-}
-
-// Initialize an empty bucket
-static void Initialize_Bucket(Bucket **bucket, int size) {
-	int i;
-
-	CHECK_MALLOC_NULL((*bucket) = malloc(sizeof(Bucket)));
-	(*bucket)->next_bucket = NULL;
-	CHECK_MALLOC_NULL((*bucket)->voters = malloc(size * sizeof(Voter *)));
-	(*bucket)->count = 0;
-	for (i = 0; i < size; i++) {
-		(*bucket)->voters[i] = NULL;
 	}
 }
 
@@ -82,7 +68,13 @@ static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
 
 	// Create a bucket
 	if ((*bucket) == NULL) {
-		Initialize_Bucket(bucket, size);
+		CHECK_MALLOC_NULL((*bucket) = malloc(sizeof(Bucket)));
+		(*bucket)->next_bucket = NULL;
+		CHECK_MALLOC_NULL((*bucket)->voters = malloc(size * sizeof(Voter *)));
+		(*bucket)->count = 0;
+		for (i = 0; i < size; i++) {
+			(*bucket)->voters[i] = NULL;
+		}
 	}
 	if ((*bucket)->count == size) {
 		Insert_Bucket(&((*bucket)->next_bucket), voter, size); // Overflow bucket
@@ -97,13 +89,11 @@ static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
 static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 	int i;
 	Bucket *curr_bucket = (*b1);
-	Bucket *new_bucket, *temp_bucket;
-
-	Initialize_Bucket(&new_bucket, ht->bucketentries);
+	Bucket *new_bucket = NULL, *temp_bucket;
 
 	while (curr_bucket != NULL) {
 		for (i = 0; i < curr_bucket->count; i++) {
-			if (curr_bucket->voters[i]->PIN % (2 * ht->m) == ht->num_buckets - 1) {
+			if ((curr_bucket->voters[i]->PIN % (2 * ht->m)) == ht->num_buckets - 1) {
 				Insert_Bucket(b2, curr_bucket->voters[i], ht->bucketentries);
 			}
 			else {
@@ -115,7 +105,22 @@ static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 		free(curr_bucket);
 		curr_bucket = temp_bucket;
 	}
-	(*b1) = new_bucket;
+
+	(*b1) = NULL;
+	temp_bucket = new_bucket;
+	while (temp_bucket != NULL) {
+		for (i = 0; i < temp_bucket->count; i++) {
+			Insert_Bucket(b1, temp_bucket->voters[i], ht->bucketentries);
+		}
+		temp_bucket = temp_bucket->next_bucket;
+	}
+
+	while (new_bucket != NULL) {
+		free(new_bucket->voters);
+		temp_bucket = new_bucket->next_bucket;
+		free(new_bucket);
+		new_bucket = temp_bucket;
+	}
 }
 
 // Searches if there is a voter with a given PIN
@@ -125,7 +130,7 @@ Voter* Search_HT(HTptr ht, int pin) {
 	int i1 = pin % ht->m;
 	int i2 = pin % (2 * ht->m);
 	Bucket *bucket1 = ht->buckets[i1];
-	Bucket *bucket2 = ht->buckets[i2];
+	Bucket *bucket2;
 
 	// Search the first bucket
 	while (bucket1 != NULL) {
@@ -137,13 +142,16 @@ Voter* Search_HT(HTptr ht, int pin) {
 		bucket1 = bucket1->next_bucket;
 	}
 	// Search the second bucket
-	while (bucket2 != NULL) {
-		for (j = 0; j < bucket2->count; j++) {
-			if (bucket2->voters[j]->PIN == pin) {
-				return bucket2->voters[j]; // Found pin
+	if (i1 > ht->p) {
+		bucket2 = ht->buckets[i2];
+		while (bucket2 != NULL) {
+			for (j = 0; j < bucket2->count; j++) {
+				if (bucket2->voters[j]->PIN == pin) {
+					return bucket2->voters[j]; // Found pin
+				}
 			}
+			bucket2 = bucket2->next_bucket;
 		}
-		bucket2 = bucket2->next_bucket;
 	}
 	// Pin was not found
 	return NULL;

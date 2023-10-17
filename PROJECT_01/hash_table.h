@@ -9,7 +9,7 @@ typedef struct bucket {
 typedef struct hash_table {
 	int m;
 	int p;
-	int num_keys;
+	int num_keys; // Number of voters there are in the table
 	int num_buckets;
 	int bucketentries;
 	Bucket **buckets;

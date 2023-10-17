@@ -8,6 +8,7 @@ GDB
 
 gdb ./mvote
 run -f voters50.csv -b 3
+run -f voters5000.csv -b 5
 backtrace
 backtrace full
 
@@ -15,16 +16,43 @@ VALGRIND
 
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./mvote -f voters50.csv -b 3
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./mvote -b 6 -f voters500.csv
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./mvote -f voters5000.csv -b 5
+
+CASE 1
+
+// 50
+l 100103
+l 1001
+
+//5000
+l 101699
 
 CASE 2
 
 i 8282 Kozi Jenny 11364
 i 56.8 Linkon James 23947
 i 3948 Jk3jk Penny 333
-i 4567 Doe John 44.45
+i 4567 Doe John 44.p5
 i 100065 Pitt Brad 84374
 
 CASE 3
+
+m 100024
+m 100040
+m 100007
+m 100043
+m 100068
+m 8282
+m 5t6
+m 234
+
+CASE 4
+
+bv keys50.txt
+bv keys5000.txt
+
+CASE 6
+
 
 
 WRONG
