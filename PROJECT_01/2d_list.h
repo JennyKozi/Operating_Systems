@@ -7,6 +7,7 @@ typedef struct node {
 
 typedef struct node_2d {
 	int zipcode;
+	int count;
 	struct node_2d *next_node;
 	struct node *voters;
 } ListNode_2d;
@@ -18,4 +19,5 @@ void Create_List(Listptr *);
 int Size_List(Listptr);
 void Insert_List(Listptr *, Voter *);
 void Print_Zip_List(Listptr, int);
+void Print_Descending_List(Listptr);
 void Delete_List(Listptr *);

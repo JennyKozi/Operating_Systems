@@ -51,9 +51,10 @@ CASE 4
 bv keys50.txt
 bv keys5000.txt
 
-CASE 6
+CASE 7
 
-
+// 5000
+z 4000
 
 WRONG
 

@@ -18,6 +18,7 @@ void Create_List(Listptr *list) {
 	(*list)->voters = NULL;
 	(*list)->next_node = NULL;
 	(*list)->zipcode = -1;
+	(*list)->count = 0;
 }
 
 // Insert a voter in the list
@@ -30,6 +31,7 @@ void Insert_List(Listptr *list, Voter *voter) {
 	// First insert
 	if ((*list)->zipcode == -1) {
 		(*list)->zipcode = voter->zipcode;
+		(*list)->count = 1;
 		CHECK_MALLOC_NULL((*list)->voters = malloc(sizeof(ListNode)));
 		(*list)->voters->voter = voter;
 		(*list)->voters->next_voter = NULL;
@@ -41,6 +43,7 @@ void Insert_List(Listptr *list, Voter *voter) {
 		if (current->zipcode == voter->zipcode) {
 			temp = current->voters;
 			temp_prev = current->voters;
+			current->count++;
 			while (temp != NULL) {
 				temp_prev = temp;
 				temp = temp->next_voter;
@@ -50,35 +53,17 @@ void Insert_List(Listptr *list, Voter *voter) {
 			temp_prev->next_voter->next_voter = NULL;
 			return;
 		}
-		// Zip of current node less than zip of new voter => Go to the next node
-		else if (current->zipcode < voter->zipcode) {
-			prev = current;
-			current = current->next_node;
-		}
-		else { // current->zipcode > voter->zipcode
-			CHECK_MALLOC_NULL(new_n = malloc(sizeof(ListNode_2d)));
-			new_n->next_node = current;
-			new_n->zipcode = voter->zipcode;
-			CHECK_MALLOC_NULL(new_n->voters = malloc(sizeof(ListNode)));
-			new_n->voters->voter = voter;
-			new_n->voters->next_voter = NULL;
-			if (prev != NULL) {
-				prev->next_node = new_n;
-			}
-			else {
-				(*list) = new_n;
-			}
-			return;
-		}
+		current = current->next_node;
 	}
 
-	// New zip greater than current greatest zip on the list => Create new node at the end
-	CHECK_MALLOC_NULL(prev->next_node = malloc(sizeof(ListNode_2d)));
-	prev->next_node->next_node = NULL;
-	prev->next_node->zipcode = voter->zipcode;
-	CHECK_MALLOC_NULL(prev->next_node->voters = malloc(sizeof(ListNode)));
-	prev->next_node->voters->voter = voter;
-	prev->next_node->voters->next_voter = NULL;
+	CHECK_MALLOC_NULL(current = malloc(sizeof(ListNode_2d)));
+	current->zipcode = voter->zipcode;
+	current->count = 1;
+	current->next_node = (*list);
+	CHECK_MALLOC_NULL(current->voters = malloc(sizeof(ListNode)));
+	current->voters->voter = voter;
+	current->voters->next_voter = NULL;
+	(*list) = current;
 }
 
 // Count how many people have voted
@@ -99,7 +84,31 @@ int Size_List(Listptr list) {
 }
 
 void Print_Zip_List(Listptr list, int zip) {
-	
+	Listptr current = list;
+	ListNode *temp;
+	while (current != NULL) {
+		if (current->zipcode == zip) {
+			printf("%d voted in %d\n", current->count, zip);
+			temp = current->voters;
+			while (temp != NULL) {
+				printf("%d\n", temp->voter->PIN);
+				temp = temp->next_voter;
+			}
+			printf("\n");
+			return;
+		}
+		current = current->next_node;
+	}
+	printf("0 voted in %d\n\n", zip);
+}
+
+void Print_Descending_List(Listptr list) {
+	Listptr current = list;
+	while (current != NULL) {
+		printf("%d %d\n", current->zipcode, current->count);
+		current = current->next_node;
+	}
+	printf("\n");
 }
 
 // Delete 2d list, free memory

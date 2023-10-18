@@ -202,11 +202,11 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 				continue;
 			}
 			if (voter->has_voted == 'Y') {
-				printf("%d Marked Voted\n", pin);
+				printf("%d Marked Voted\n\n", pin);
 			}
 			else {
 				voter->has_voted = 'Y';
-				printf("%d Marked Voted\n", pin);
+				printf("%d Marked Voted\n\n", pin);
 				Insert_List(&list_voted, voter);
 			}
 		}
@@ -217,14 +217,14 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			scanf("%s", input); // file name
 			fileofkeys = fopen(input, "r");
 			if (!fileofkeys) {
-    			printf("%s could not be opened\n", input);
+    			printf("%s could not be opened\n\n", input);
     			continue;
     		}
 			// Read keys from file
 			while (fscanf(fileofkeys, "%s", input) == 1) {
 				// Pin must be int
 				if (Check_Int(input) == 0) {
-					printf("Malformed Input\n\n");
+					printf("Malformed Input\n");
 					continue;
 				}
 				pin = atoi(input);
@@ -232,7 +232,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 				// Check if voter exists
 				voter = Search_HT(table_voters, pin);
 				if (voter == NULL) {
-					printf("%d does not exist\n\n", pin);
+					printf("%d does not exist\n", pin);
 					continue;
 				}
 				if (voter->has_voted == 'Y') {
@@ -265,17 +265,17 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 		// CASE 7
 		else if (strcmp(command, "z") == 0) {
 			scanf("%d", &zip);
-
+			Print_Zip_List(list_voted, zip);
 		}
 
 		// CASE 8
 		else if (strcmp(command, "o") == 0) {
-
+			Print_Descending_List(list_voted);
 		}
 
 		// CASE 9
 		else if (strcmp(command, "exit") == 0) {
-			printf(" of Bytes Released\n");
+			printf("%d of Bytes Released\n", num_bytes);
 			break;
 		}
 	}
