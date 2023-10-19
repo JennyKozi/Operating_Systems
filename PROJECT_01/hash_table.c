@@ -150,7 +150,7 @@ Voter* Search_HT(HTptr ht, int pin) {
 		bucket1 = bucket1->next_bucket;
 	}
 	// Search the second bucket
-	if (i1 > ht->p) {
+	if (i2 <= ht->num_buckets - 1) {
 		bucket2 = ht->buckets[i2];
 		while (bucket2 != NULL) {
 			for (j = 0; j < bucket2->count; j++) {

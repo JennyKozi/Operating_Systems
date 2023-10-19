@@ -16,6 +16,7 @@ VALGRIND
 
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./mvote -f voters50.csv -b 3
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./mvote -b 6 -f voters500.csv
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./mvote -f voters500.csv -b 3
 valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./mvote -f voters5000.csv -b 5
 
 CASE 1

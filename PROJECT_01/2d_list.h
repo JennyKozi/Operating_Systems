@@ -7,9 +7,9 @@ typedef struct node {
 
 typedef struct node_2d {
 	int zipcode;
-	int count;
+	int count; // number of voters (with the same zip) who have voted with
 	struct node_2d *next_node;
-	struct node *voters;
+	struct node *voters; // a list of voters (with the same zip) who have voted with
 } ListNode_2d;
 
 typedef struct node_2d *Listptr;
