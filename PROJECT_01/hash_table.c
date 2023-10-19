@@ -12,7 +12,7 @@ if ((p) == NULL) {  \
 	exit(1);  \
 };
 
-extern int num_bytes;
+extern long int num_bytes;
 
 static void Insert_Bucket(Bucket **, Voter *, int);
 static void Bucket_Split(HTptr ht, Bucket **, Bucket **);
@@ -22,12 +22,14 @@ void Create_HT(HTptr *ht, int num_entries) {
 	int i;
 
 	CHECK_MALLOC_NULL((*ht) = malloc(sizeof(HT)));
+	num_bytes = num_bytes + sizeof(HT);
 	(*ht)->m = M;
 	(*ht)->p = 0;
 	(*ht)->num_buckets = M;
 	(*ht)->num_keys = 0;
 	(*ht)->bucketentries = num_entries;
 	CHECK_MALLOC_NULL((*ht)->buckets = malloc(M * sizeof(Bucket *)));
+	num_bytes = num_bytes + (M * sizeof(Bucket *));
 	for (i = 0; i < M; i++) {
 		(*ht)->buckets[i] = NULL;
 	}
@@ -69,8 +71,10 @@ static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
 	// Create a bucket
 	if ((*bucket) == NULL) {
 		CHECK_MALLOC_NULL((*bucket) = malloc(sizeof(Bucket)));
+		num_bytes = num_bytes + sizeof(Bucket);
 		(*bucket)->next_bucket = NULL;
 		CHECK_MALLOC_NULL((*bucket)->voters = malloc(size * sizeof(Voter *)));
+		num_bytes = num_bytes + (size * sizeof(Voter *));
 		(*bucket)->count = 0;
 		for (i = 0; i < size; i++) {
 			(*bucket)->voters[i] = NULL;
@@ -100,8 +104,10 @@ static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 				Insert_Bucket(&new_bucket, curr_bucket->voters[i], ht->bucketentries);
 			}
 		}
+		num_bytes = num_bytes - sizeof(curr_bucket->voters);
 		free(curr_bucket->voters);
 		temp_bucket = curr_bucket->next_bucket;
+		num_bytes = num_bytes - sizeof(curr_bucket);
 		free(curr_bucket);
 		curr_bucket = temp_bucket;
 	}
@@ -116,8 +122,10 @@ static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 	}
 
 	while (new_bucket != NULL) {
+		num_bytes = num_bytes - sizeof(new_bucket->voters);
 		free(new_bucket->voters);
 		temp_bucket = new_bucket->next_bucket;
+		num_bytes = num_bytes - sizeof(new_bucket);
 		free(new_bucket);
 		new_bucket = temp_bucket;
 	}

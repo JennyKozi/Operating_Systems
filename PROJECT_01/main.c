@@ -15,7 +15,7 @@ if ((p) == NULL) {  \
 };
 
 // Global variable to count bytes allocted
-int num_bytes = 0;
+long int num_bytes = 0;
 
 int Check_Int(char *);
 int Check_String(char *);
@@ -76,6 +76,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	CHECK_MALLOC_NULL(input = malloc(SIZE * sizeof(char)));
 	CHECK_MALLOC_NULL(lname = malloc(SIZE * sizeof(char)));
 	CHECK_MALLOC_NULL(fname = malloc(SIZE * sizeof(char)));
+	num_bytes = num_bytes + (4 * SIZE * sizeof(char));
 
 	// Create hash table
 	Create_HT(&table_voters, bucketentries);
@@ -94,6 +95,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 		CHECK_MALLOC_NULL(voter = malloc(sizeof(Voter)));
 		CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1));
 		CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1));
+		num_bytes = num_bytes + sizeof(Voter) + strlen(fname) + strlen(lname) + 2;
 
 		strcpy(voter->last_name, lname);
 		strcpy(voter->first_name, fname);
@@ -173,6 +175,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			CHECK_MALLOC_NULL(voter = malloc(sizeof(Voter)));
 			CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1));
 			CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1));
+			num_bytes = num_bytes + sizeof(Voter) + strlen(fname) + strlen(lname) + 2;
 
 			voter->has_voted = 'N'; // They haven't voted
 			voter->PIN = pin; // We have scanned their unique pin
@@ -275,7 +278,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 
 		// CASE 9
 		else if (strcmp(command, "exit") == 0) {
-			printf("%d of Bytes Released\n", num_bytes);
+			printf("%ld of Bytes Released\n", num_bytes);
 			break;
 		}
 	}

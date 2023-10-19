@@ -9,12 +9,13 @@ if ((p) == NULL) {  \
 	exit(1);  \
 };
 
-extern int num_bytes;
+extern long int num_bytes;
 
 // Create 2d_list
 void Create_List(Listptr *list) {
 
 	CHECK_MALLOC_NULL((*list) = malloc(sizeof(ListNode_2d)));
+	num_bytes = num_bytes + sizeof(ListNode_2d);
 	(*list)->voters = NULL;
 	(*list)->next_node = NULL;
 	(*list)->zipcode = -1;
@@ -23,21 +24,24 @@ void Create_List(Listptr *list) {
 
 // Insert a voter in the list
 void Insert_List(Listptr *list, Voter *voter) {
-	Listptr prev, current, new_n;
+	Listptr prev = NULL, current, curr_n, prev_n = NULL, temp_n;
 	ListNode *temp_prev, *temp;
 	current = *list;
-	prev = NULL;
 
 	// First insert
-	if ((*list)->zipcode == -1) {
-		(*list)->zipcode = voter->zipcode;
-		(*list)->count = 1;
-		CHECK_MALLOC_NULL((*list)->voters = malloc(sizeof(ListNode)));
-		(*list)->voters->voter = voter;
-		(*list)->voters->next_voter = NULL;
-		return;
+	if ((*list) != NULL) {
+		if ((*list)->zipcode == -1) {
+			(*list)->zipcode = voter->zipcode;
+			(*list)->count = 1;
+			CHECK_MALLOC_NULL((*list)->voters = malloc(sizeof(ListNode)));
+			num_bytes = num_bytes + sizeof(ListNode);
+			(*list)->voters->voter = voter;
+			(*list)->voters->next_voter = NULL;
+			return;
+		}
 	}
 
+	// Find if there is a node with the new voter's zip
 	while (current != NULL) {
 		// Found the node with the correct zip
 		if (current->zipcode == voter->zipcode) {
@@ -49,21 +53,46 @@ void Insert_List(Listptr *list, Voter *voter) {
 				temp = temp->next_voter;
 			}
 			CHECK_MALLOC_NULL(temp_prev->next_voter = malloc(sizeof(ListNode)));
+			num_bytes = num_bytes + sizeof(ListNode);
 			temp_prev->next_voter->voter = voter;
 			temp_prev->next_voter->next_voter = NULL;
+
+//			curr_n = (*list);
+//			while (curr_n != NULL) {
+//				if ((current->count > curr_n->count) && prev != NULL && prev_n != NULL) {
+//					prev->next_node = current->next_node;
+//					prev_n->next_node = current;
+//					current->next_node = curr_n;
+//					return;
+//				}
+				// Insert in the beggining of the list
+//				if ((current->count > curr_n->count) && prev_n == NULL) {
+//					prev->next_node = current->next_node;
+//					current->next_node = (*list);
+//					(*list) = current;
+//					return;
+//				}
+//				prev_n = curr_n;
+//				curr_n = curr_n->next_node;
+//			}
 			return;
 		}
+		prev = current;
 		current = current->next_node;
 	}
 
-	CHECK_MALLOC_NULL(current = malloc(sizeof(ListNode_2d)));
-	current->zipcode = voter->zipcode;
-	current->count = 1;
-	current->next_node = (*list);
-	CHECK_MALLOC_NULL(current->voters = malloc(sizeof(ListNode)));
-	current->voters->voter = voter;
-	current->voters->next_voter = NULL;
-	(*list) = current;
+	// Create a new node in the end of the list (no one with this zip has voted yet)
+	if (prev != NULL) {
+		CHECK_MALLOC_NULL(prev->next_node = malloc(sizeof(ListNode_2d)));
+		num_bytes = num_bytes + sizeof(ListNode_2d);
+		prev->next_node->zipcode = voter->zipcode;
+		prev->next_node->count = 1;
+		prev->next_node->next_node = NULL;
+		CHECK_MALLOC_NULL(prev->next_node->voters = malloc(sizeof(ListNode)));
+		num_bytes = num_bytes + sizeof(ListNode);
+		prev->next_node->voters->voter = voter;
+		prev->next_node->voters->next_voter = NULL;
+	}
 }
 
 // Count how many people have voted
