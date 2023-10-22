@@ -6,6 +6,7 @@
 #define M 4 // Initial number of buckets for the hash table
 #define L 0.75 // Threshold
 
+// Check if the memory is allocated and malloc didn't fail
 #define CHECK_MALLOC_NULL(p)  \
 if ((p) == NULL) {  \
 	printf("Cannot allocate memory!\n"); \
@@ -44,18 +45,19 @@ void Insert_HT(HTptr ht, Voter *voter) {
 		i = voter->PIN % (2 * (ht->m)); // Recalculate the index of the bucket
 	}
 	Insert_Bucket(&(ht->buckets[i]), voter, ht->bucketentries);
-	ht->num_keys++;
+	ht->num_keys++; // Added new voter
 
 	// Calculate threshold
 	float l = ((float)ht->num_keys) / (ht->num_buckets * ht->bucketentries);
 
 	// If l is greater than the threshold
 	if (l > L) {
-		ht->num_buckets++;
+		ht->num_buckets++; // Create a new non-overflow bucket
 		ht->buckets = realloc(ht->buckets, ht->num_buckets * sizeof(Bucket *));
 		ht->buckets[ht->num_buckets - 1] = NULL;
 		Bucket_Split(ht, &(ht->buckets[ht->p]), &(ht->buckets[ht->num_buckets - 1]));
 		ht->p++; // p points to the next bucket that will split
+
 		// Complete round
 		if (ht->p == ht->m) {
 			ht->m = 2 * ht->m;
@@ -68,7 +70,7 @@ void Insert_HT(HTptr ht, Voter *voter) {
 static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
 	int i = 0;
 
-	// Create a bucket
+	// Create a bucket if it doesn't exist
 	if ((*bucket) == NULL) {
 		CHECK_MALLOC_NULL((*bucket) = malloc(sizeof(Bucket)));
 		num_bytes = num_bytes + sizeof(Bucket);
@@ -80,9 +82,11 @@ static void Insert_Bucket(Bucket **bucket, Voter *voter, int size) {
 			(*bucket)->voters[i] = NULL;
 		}
 	}
+	// Insert to overflow bucket
 	if ((*bucket)->count == size) {
-		Insert_Bucket(&((*bucket)->next_bucket), voter, size); // Overflow bucket
+		Insert_Bucket(&((*bucket)->next_bucket), voter, size);
 	}
+	// The bucket has space for a new voter
 	else {
 		(*bucket)->voters[(*bucket)->count] = voter;
 		(*bucket)->count++;
@@ -97,21 +101,24 @@ static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 
 	while (curr_bucket != NULL) {
 		for (i = 0; i < curr_bucket->count; i++) {
+			// Voters for bucket b2 (new bucket from split)
 			if ((curr_bucket->voters[i]->PIN % (2 * ht->m)) == ht->num_buckets - 1) {
 				Insert_Bucket(b2, curr_bucket->voters[i], ht->bucketentries);
 			}
+			// Voters that will remain in bucket b1
 			else {
 				Insert_Bucket(&new_bucket, curr_bucket->voters[i], ht->bucketentries);
 			}
 		}
-		num_bytes = num_bytes - sizeof(curr_bucket->voters);
+		num_bytes = num_bytes - sizeof(curr_bucket->voters); // Free bytes
 		free(curr_bucket->voters);
 		temp_bucket = curr_bucket->next_bucket;
-		num_bytes = num_bytes - sizeof(curr_bucket);
+		num_bytes = num_bytes - sizeof(curr_bucket); // Free bytes
 		free(curr_bucket);
 		curr_bucket = temp_bucket;
 	}
 
+	// The new bucket is a temp bucket for the entries that will remain in bucket b1
 	(*b1) = NULL;
 	temp_bucket = new_bucket;
 	while (temp_bucket != NULL) {
@@ -121,11 +128,12 @@ static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 		temp_bucket = temp_bucket->next_bucket;
 	}
 
+	// Delete the temp bucket
 	while (new_bucket != NULL) {
-		num_bytes = num_bytes - sizeof(new_bucket->voters);
+		num_bytes = num_bytes - sizeof(new_bucket->voters); // Free bytes
 		free(new_bucket->voters);
 		temp_bucket = new_bucket->next_bucket;
-		num_bytes = num_bytes - sizeof(new_bucket);
+		num_bytes = num_bytes - sizeof(new_bucket); // Free bytes
 		free(new_bucket);
 		new_bucket = temp_bucket;
 	}
@@ -135,27 +143,27 @@ static void Bucket_Split(HTptr ht, Bucket **b1, Bucket **b2) {
 Voter* Search_HT(HTptr ht, int pin) {
 
 	int j;
-	int i1 = pin % ht->m;
-	int i2 = pin % (2 * ht->m);
-	Bucket *bucket1 = ht->buckets[i1];
+	int i1 = pin % ht->m; // Index of first bucket
+	int i2 = pin % (2 * ht->m); // Index of second bucket
+	Bucket *bucket1 = ht->buckets[i1]; // First bucket
 	Bucket *bucket2;
 
 	// Search the first bucket
 	while (bucket1 != NULL) {
 		for (j = 0; j < bucket1->count; j++) {
 			if (bucket1->voters[j]->PIN == pin) {
-				return bucket1->voters[j]; // Found pin
+				return bucket1->voters[j]; // Found pin, return pointer to the voter we want
 			}
 		}
 		bucket1 = bucket1->next_bucket;
 	}
 	// Search the second bucket
 	if (i2 <= ht->num_buckets - 1) {
-		bucket2 = ht->buckets[i2];
+		bucket2 = ht->buckets[i2]; // Second bucket
 		while (bucket2 != NULL) {
 			for (j = 0; j < bucket2->count; j++) {
 				if (bucket2->voters[j]->PIN == pin) {
-					return bucket2->voters[j]; // Found pin
+					return bucket2->voters[j]; // Found pin, return pointer to the voter we want
 				}
 			}
 			bucket2 = bucket2->next_bucket;
@@ -174,7 +182,10 @@ void Delete_HT(HTptr *ht) {
 
 	for (i = 0; i < (*ht)->num_buckets; i++) {
 		bucket = array_buckets[i];
+		
+		// Delete buckets
 		while (bucket != NULL) {
+			// Delete voters
 			for (j = 0; j < bucket->count; j++) {
 				free(bucket->voters[j]->first_name);
 				free(bucket->voters[j]->last_name);

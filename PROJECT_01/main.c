@@ -6,8 +6,9 @@
 #include "hash_table.h"
 #include "2d_list.h"
 
-#define SIZE 40
+#define SIZE 40 // size for buffers
 
+// Check if the memory is allocated and malloc didn't fail
 #define CHECK_MALLOC_NULL(p)  \
 if ((p) == NULL) {  \
 	printf("Cannot allocate memory!\n"); \
@@ -17,6 +18,7 @@ if ((p) == NULL) {  \
 // Global variable to count bytes allocted
 long int num_bytes = 0;
 
+// Check input from user
 int Check_Int(char *);
 int Check_String(char *);
 
@@ -85,7 +87,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	Create_List(&list_voted);
 
 	// Read the voters from the file
-	while (fscanf(fp, "%d", &pin) == 1) {
+	while (fscanf(fp, "%d", &pin) == 1) { // Scan pin
 
 		fscanf(fp, "%s", fname); // Scan first name
 		fscanf(fp, "%s", lname); // Scan last name
@@ -93,15 +95,15 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 		
 		// Create voter
 		CHECK_MALLOC_NULL(voter = malloc(sizeof(Voter)));
-		CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1));
-		CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1));
-		num_bytes = num_bytes + sizeof(Voter) + strlen(fname) + strlen(lname) + 2;
+		CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1)); // Allocate memory for first name
+		CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1)); // Allocate memory for last name
+		num_bytes = num_bytes + sizeof(Voter) + strlen(fname) + strlen(lname) + 2; // Increase bytes allocated with malloc
 
-		strcpy(voter->last_name, lname);
-		strcpy(voter->first_name, fname);
+		strcpy(voter->last_name, lname); // Write first name
+		strcpy(voter->first_name, fname); // Write last name
 		voter->has_voted = 'N'; // They haven't voted
 		voter->PIN = pin; // We have scanned their unique pin
-		voter->zipcode = zip;
+		voter->zipcode = zip; // Write zipcode
 
 		Insert_HT(table_voters, voter); // Insert voter in hash table
 	}
@@ -124,12 +126,12 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			}
 			pin = atoi(input);
 
-			// Check if voter os in hash table
+			// Check if voter is in hash table
 			voter = Search_HT(table_voters, pin);
-			if (voter != NULL) {
+			if (voter != NULL) { // Voter exists
 				printf("%d %s %s %d %c\n\n", voter->PIN, voter->last_name, voter->first_name, voter->zipcode, voter->has_voted);
 			}
-			else {
+			else { // Voter doesn't exist
 				printf("Participant %d not in cohort\n\n", pin);
 			}
 		}
@@ -147,7 +149,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			
 			// Check if voter exists
 			voter = Search_HT(table_voters, pin);
-			if (voter != NULL) {
+			if (voter != NULL) { // Voter doesn't exist
 				printf("%d already exists\n\n", pin);
 				continue;
 			}
@@ -173,14 +175,14 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			
 			// Create voter
 			CHECK_MALLOC_NULL(voter = malloc(sizeof(Voter)));
-			CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1));
-			CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1));
-			num_bytes = num_bytes + sizeof(Voter) + strlen(fname) + strlen(lname) + 2;
+			CHECK_MALLOC_NULL(voter->last_name = malloc(strlen(lname) + 1)); // Allocate memory for first name
+			CHECK_MALLOC_NULL(voter->first_name = malloc(strlen(fname) + 1)); // Allocate memory for last name
+			num_bytes = num_bytes + sizeof(Voter) + strlen(fname) + strlen(lname) + 2; // Increase bytes allocated with malloc
 
 			voter->has_voted = 'N'; // They haven't voted
 			voter->PIN = pin; // We have scanned their unique pin
-			strcpy(voter->last_name, lname);
-			strcpy(voter->first_name, fname);
+			strcpy(voter->last_name, lname); // Copy first name
+			strcpy(voter->first_name, fname); // Copy last name
 			voter->zipcode = zip;
 
 			Insert_HT(table_voters, voter); // Insert voter in hash table
@@ -200,13 +202,16 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 			
 			// Check if voter exists
 			voter = Search_HT(table_voters, pin);
+			// Not found
 			if (voter == NULL) {
 				printf("%d does not exist\n\n", pin);
 				continue;
 			}
+			// Found but has already voted
 			if (voter->has_voted == 'Y') {
 				printf("%d Marked Voted\n\n", pin);
 			}
+			// Found but hasn't voted
 			else {
 				voter->has_voted = 'Y';
 				printf("%d Marked Voted\n\n", pin);
@@ -234,13 +239,16 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 
 				// Check if voter exists
 				voter = Search_HT(table_voters, pin);
+				// Not found
 				if (voter == NULL) {
 					printf("%d does not exist\n", pin);
 					continue;
 				}
+				// Found but has already voted
 				if (voter->has_voted == 'Y') {
 					printf("%d Marked Voted\n", pin);
 				}
+				// Found but hasn't voted
 				else {
 					voter->has_voted = 'Y';
 					printf("%d Marked Voted\n", pin);
@@ -260,9 +268,9 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 		// CASE 6: find the percent
 		else if (strcmp(command, "perc") == 0) {
 			total = table_voters->num_keys;
-			count_voted =  Size_List(list_voted);
+			count_voted = Size_List(list_voted);
 			percent = ((float)count_voted) / total;
-			printf("%.3f\n\n", percent);
+			printf("%.5f\n\n", percent);
 		}
 
 		// CASE 7

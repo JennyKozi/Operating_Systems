@@ -14,7 +14,7 @@ typedef struct node_2d {
 
 typedef struct node_2d *Listptr;
 
-// Functions
+// Functions for main
 void Create_List(Listptr *);
 int Size_List(Listptr);
 void Insert_List(Listptr *, Voter *);
