@@ -89,6 +89,19 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	// Read the voters from the file
 	while (fscanf(fp, "%d", &pin) == 1) { // Scan pin
 
+		// Check for duplicates (not allowed)
+		if (Search_HT(table_voters, pin) != NULL) {
+			printf("Duplicates are not allowed!\n");
+			free(command);
+			free(input);
+			free(lname);
+			free(fname);
+			Delete_HT(&table_voters);
+			Delete_List(&list_voted);
+			fclose(fp);
+			exit(1);
+		}
+
 		fscanf(fp, "%s", fname); // Scan first name
 		fscanf(fp, "%s", lname); // Scan last name
 		fscanf(fp, "%d", &zip); // Scan zipcode
@@ -109,7 +122,7 @@ int main (int argc, char *argv[]) { /* argv[0]='mvote' */
 	}
 	fclose(fp);
 
-	printf("Insert command:\n");
+	printf("Insert command:\n\n");
 
 	// Commands to mvote from command line
 	while (1) {
