@@ -1,0 +1,7 @@
+./mysort -i voters50.bin -k 3 -e1 quicksort -e2 bubblesort
+
+./mysort -e1 bubblesort -e2 quicksort -i voters500.bin -k 4
+
+./mysort -k 5 -e2 bubblesort -i voters5000.bin -e1 quicksort
+
+./mysort -e2 bubblesort -k 6 -i voters50000.bin -e1 quicksort
