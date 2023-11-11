@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-// #include <sys/wait.h>
+//#include <sys/wait.h>
 #include "header.h"
 
 static int Check_Int(char *);
@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int i, j, k, total_records, rp, stat, size, offset = 0;
+	int i, j, k, total_records, rp, stat, size;
 	long lSize;
 	char *data_file, *sort1, *sort2;
 	Record rec;
@@ -63,10 +63,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Open binary data file
-	if ((rp = open(data_file, O_RDONLY)) == -1) {
-		perror("Cannot open file!\n");
-		exit(1);
-	}
+	CHECK_FILE(rp = open(data_file, O_RDONLY));
 
 	// Get number of records
 	stat = fstat(rp, &buffer);
@@ -77,18 +74,28 @@ int main(int argc, char *argv[]) {
 	}
 	size = buffer.st_size;
 	total_records = (int)size / sizeof(rec);
-	lseek(rp, offset, SEEK_SET); // Set rp in the beginning of the file
+	lseek(rp, 0, SEEK_SET); // Set rp in the beginning of the file
 
 	int load_splitter = total_records / k; // Number of records for one splitter
 	int remaining_load_splitters = total_records % k; // The first children (spliters) will get one extra record
 
 	// Useful info for the splitters
 	pid_t *splitters;
-	int *splitters_rp, *splitters_numof_records;
+	int *splitters_pointers, *splitters_numof_records, **splitters_pipes;
 	CHECK_MALLOC_NULL(splitters = malloc(k * sizeof(pid_t)));
-	CHECK_MALLOC_NULL(splitters_rp = malloc(k * sizeof(int)));
+	CHECK_MALLOC_NULL(splitters_pointers = malloc(k * sizeof(int)));
 	CHECK_MALLOC_NULL(splitters_numof_records = malloc(k * sizeof(int)));
+	CHECK_MALLOC_NULL(splitters_pipes = malloc(k * sizeof(int *)));
 
+	// Create pipes for splitters
+	for (i = 0; i < k; i++) {
+		CHECK_MALLOC_NULL(splitters_pipes[i] = malloc(2 * sizeof(int)));
+		if (pipe(splitters_pipes[i]) < 0) {
+			perror("Error with pipe!\n");
+			exit(1);
+		}
+	}
+	
 	// Number of records for the splitters
 	for (i = 0; i < k; i++) {
 		if (remaining_load_splitters == 0) {
@@ -103,14 +110,14 @@ int main(int argc, char *argv[]) {
 	}
 
 	// File pointers for each splitter
-	for (i = 0; i < k; i++) {
-		splitters_rp[i] = dup(rp); // Create a copy of the file pointer of the data file
-		lseek(splitters_rp[i], i * splitters_numof_records[i] * sizeof(rec), SEEK_SET); // Set the file pointer of this splitter to the right byte
+	splitters_pointers[0] = 0;
+	
+	for (i = 1; i < k; i++) {
+		splitters_pointers[i] = splitters_pointers[i - 1] + (splitters_numof_records[i] * sizeof(rec));
 	}
 
 	// Create k splitters with fork
 	for (i = 0; i < k; i++) {
-
 		splitters[i] = fork();
 		if (splitters[i] == -1) {
 			perror("Failed to fork!\n");
@@ -127,10 +134,20 @@ int main(int argc, char *argv[]) {
 
 			// Useful info for the sorters of this splitter
 			pid_t *sorters;
-			int *sorters_rp, *sorters_numof_records;
+			int *sorters_pointers, *sorters_numof_records, **sorters_pipes;
 			CHECK_MALLOC_NULL(sorters = malloc(numof_sorters * sizeof(pid_t)));
-			CHECK_MALLOC_NULL(sorters_rp = malloc(numof_sorters * sizeof(int)));
+			CHECK_MALLOC_NULL(sorters_pointers = malloc(numof_sorters * sizeof(int)));
 			CHECK_MALLOC_NULL(sorters_numof_records = malloc(numof_sorters * sizeof(int)));
+			CHECK_MALLOC_NULL(sorters_pipes = malloc(numof_sorters * sizeof(int *)));
+
+			// Create pipes for splitters
+			for (j = 0; j < numof_sorters; j++) {
+				CHECK_MALLOC_NULL(sorters_pipes[j] = malloc(2 * sizeof(int)));
+				if (pipe(sorters_pipes[j]) < 0) {
+					perror("Error with pipe!\n");
+					exit(1);
+				}
+			}
 
 			// Number of records for the sorters
 			for (j = 0; j < numof_sorters; j++) {
@@ -146,9 +163,10 @@ int main(int argc, char *argv[]) {
 			}
 
 			// File pointers for each sorter
-			for (j = 0; j < numof_sorters; j++) {
-				sorters_rp[j] = dup(rp); // Create a copy of the file pointer of the data file
-				lseek(sorters_rp[j], j * sorters_numof_records[j] * sizeof(rec), SEEK_SET); // Set the file pointer of this splitter to the right byte
+			sorters_pointers[0] = 0;
+	
+			for (j = 1; j < k; j++) {
+				sorters_pointers[j] = sorters_pointers[j - 1] + (sorters_numof_records[j] * sizeof(rec));
 			}
 
 			// Create sorters of this splitter with fork
@@ -163,43 +181,61 @@ int main(int argc, char *argv[]) {
 				// SORTERS
 				if (sorters[j] == 0) {
 
-					char str1[10], str2[10];
-					snprintf(str1, sizeof(str1), "%d", sorters_rp[j]);
-					snprintf(str2, sizeof(str2), "%d", sorters_numof_records[j]);
+					close(sorters_pipes[j][0]); // Close read end for sorter
+
+					char pointer[10], num[10], pipe[10];
+					snprintf(pointer, sizeof(pointer), "%d", sorters_pointers[j]);
+					snprintf(num, sizeof(num), "%d", sorters_numof_records[j]);
+					snprintf(pipe, sizeof(pipe), "%d", sorters_pipes[j]);
 
 					// Execute a sorting algorithm
 					if (j % 2 == 0) {
-						execl("./quicksort", "./quicksort", str1, str2, (char *)NULL);
+						execl("./quicksort", "./quicksort", data_file, pointer, num, pipe, (char *)NULL);
 						perror("exec failure!\n");
 						exit(1);
 					}
 					else {
-						execl("./bubblesort", "./bubblesort", str1, str2, (char *)NULL);
+						execl("./bubblesort", "./bubblesort", data_file, pointer, num, pipe, (char *)NULL);
 						perror("exec failure!\n");
 						exit(1);
 					}
 				}
-
-				// Parent process: SPLITTER
-				else {
-
-				}
+				close(sorters_pipes[j][1]); // Close write end for splitter
 			}
+			// Parent process: SPLITTER
+			// Read from pipes
+
+			// Merge sorted records
+
+
+			// Free memory allocated by splitter
 			free(sorters);
-			free(sorters_rp);
+			free(sorters_pointers);
 			free(sorters_numof_records);
+			for (j = 0; j < numof_sorters; j++) {
+				free(sorters_pipes[j]);
+			}
+			free(sorters_pipes);
+			exit(0); // End splitter process
 		}
-
-		// Parent process: MYSORT
-		else {
-
-		}
+		close(splitters_pipes[i][1]); // Close write end for root
 	}
+	// Parent process: MYSORT
+	// Read from pipes
 
-	close(rp);
+	// Merge sorted records
+	
+
+	close(rp); // Close file pointer for root
+
+	// Free memory allocated by root
 	free(splitters);
-	free(splitters_rp);
+	free(splitters_pointers);
 	free(splitters_numof_records);
+	for (i = 0; i < k; i++) {
+		free(splitters_pipes[i]);
+	}
+	free(splitters_pipes);
 
 	return 0;
 }
