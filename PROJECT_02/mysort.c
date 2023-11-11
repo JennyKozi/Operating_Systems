@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
 	splitters_pointers[0] = 0;
 	
 	for (i = 1; i < k; i++) {
-		splitters_pointers[i] = splitters_pointers[i - 1] + (splitters_numof_records[i] * sizeof(rec));
+		splitters_pointers[i] = splitters_pointers[i - 1] + (splitters_numof_records[i - 1] * sizeof(rec));
 	}
 
 	// Create k splitters with fork
@@ -163,10 +163,10 @@ int main(int argc, char *argv[]) {
 			}
 
 			// File pointers for each sorter
-			sorters_pointers[0] = 0;
+			sorters_pointers[0] = splitters_pointers[i];
 	
-			for (j = 1; j < k; j++) {
-				sorters_pointers[j] = sorters_pointers[j - 1] + (sorters_numof_records[j] * sizeof(rec));
+			for (j = 1; j < numof_sorters; j++) {
+				sorters_pointers[j] = sorters_pointers[j - 1] + (sorters_numof_records[j - 1] * sizeof(rec));
 			}
 
 			// Create sorters of this splitter with fork
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
 					char pointer[10], num[10], pipe[10];
 					snprintf(pointer, sizeof(pointer), "%d", sorters_pointers[j]);
 					snprintf(num, sizeof(num), "%d", sorters_numof_records[j]);
-					snprintf(pipe, sizeof(pipe), "%d", sorters_pipes[j]);
+					snprintf(pipe, sizeof(pipe), "%d", sorters_pipes[j][1]);
 
 					// Execute a sorting algorithm
 					if (j % 2 == 0) {
@@ -204,6 +204,7 @@ int main(int argc, char *argv[]) {
 			}
 			// Parent process: SPLITTER
 			// Read from pipes
+
 
 			// Merge sorted records
 
@@ -223,8 +224,12 @@ int main(int argc, char *argv[]) {
 	// Parent process: MYSORT
 	// Read from pipes
 
+
 	// Merge sorted records
+
 	
+	// Print sorted list
+
 
 	close(rp); // Close file pointer for root
 
