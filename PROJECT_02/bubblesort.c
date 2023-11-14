@@ -75,6 +75,9 @@ int main (int argc, char *argv[]) {
 		write(pipe, array[i].LastName, sizeof(rec.LastName));
 		write(pipe, array[i].postcode, sizeof(rec.postcode));
 	}
+
+	int stop;
+	write(pipe, &stop, sizeof(int));
 	
 	close(rp); // Close file pointer for sorter
 	close(pipe); // Close write end for sorter
