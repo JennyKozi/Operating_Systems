@@ -10,7 +10,11 @@
 //#include <sys/wait.h>
 #include "header.h"
 
+#define READ_END 0
+#define WRITE_END 1
+
 static int Check_Int(char *);
+void merge(Record **, int, int, int);
 
 int main(int argc, char *argv[]) {
 
@@ -22,11 +26,12 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int i, j, k, total_records, rp, stat, size;
+	int i, j, k, total_records, rp, stat, size, stop = -1;
 	long lSize;
-	char *data_file, *sort1, *sort2;
+	char *data_file, *sort1, *sort2, *prog1, *prog2;
 	Record rec;
 	struct stat buffer;
+	pid_t root_pid = getpid();
 
 	// Check that the flags are correct
 	for (i = 1; i <= 7; i += 2) {
@@ -65,6 +70,14 @@ int main(int argc, char *argv[]) {
 			exit(1);
 		}
 	}
+
+	// Preparing the strings for the execution of the programs
+	CHECK_MALLOC_NULL(prog1 = malloc((strlen(sort1) + 2) * sizeof(char)));
+	CHECK_MALLOC_NULL(prog2 = malloc((strlen(sort2) + 2) * sizeof(char)));
+	strcpy(prog1, "./");
+	strcat(prog1, sort1);
+	strcpy(prog2, "./");
+	strcat(prog2, sort2);
 
 	// Open binary data file
 	CHECK_FILE(rp = open(data_file, O_RDONLY));
@@ -117,7 +130,7 @@ int main(int argc, char *argv[]) {
 	splitters_pointers[0] = 0;
 	
 	for (i = 1; i < k; i++) {
-		splitters_pointers[i] = splitters_pointers[i - 1] + (splitters_numof_records[i - 1] * sizeof(rec));
+		splitters_pointers[i] = splitters_pointers[i - 1] + (splitters_numof_records[i - 1] * sizeof(Record));
 	}
 
 	// Create k splitters with fork
@@ -131,7 +144,7 @@ int main(int argc, char *argv[]) {
 		// SPLITTERS
 		if (splitters[i] == 0) {
 
-			close(splitters_pipes[i][0]); // Close read end for splitter (splitter - root)
+			close(splitters_pipes[i][READ_END]); // Close read end for splitter (splitter - root)
 
 			// Number of sorters this splitter has
 			int numof_sorters = k - i;
@@ -187,26 +200,27 @@ int main(int argc, char *argv[]) {
 				// SORTERS
 				if (sorters[j] == 0) {
 
-					close(sorters_pipes[j][0]); // Close read end for sorter (sorter - splitter)
+					close(sorters_pipes[j][READ_END]); // Close read end for sorter (sorter - splitter)
 
-					char pointer[10], num[10], pipe[10];
+					char pointer[10], num[10], pipe[10], pid[10];
 					snprintf(pointer, sizeof(pointer), "%d", sorters_pointers[j]);
 					snprintf(num, sizeof(num), "%d", sorters_numof_records[j]);
-					snprintf(pipe, sizeof(pipe), "%d", sorters_pipes[j][1]);
+					snprintf(pipe, sizeof(pipe), "%d", sorters_pipes[j][WRITE_END]);
+					snprintf(pid, sizeof(pid), "%d", root_pid);
 
-					// Execute a sorting algorithm
+					// Execute a sorting algorithm (choose an algorithm)
 					if (j % 2 == 0) {
-						execl("./bubblesort", "./bubblesort", data_file, pointer, num, pipe, (char *)NULL);
+						execl(prog1, prog1, data_file, pointer, num, pipe, pid, (char *)NULL);
 						perror("exec failure!\n");
 						exit(1);
 					}
 					else {
-						execl("./selectionsort", "./selectionsort", data_file, pointer, num, pipe, (char *)NULL);
+						execl(prog2, prog2, data_file, pointer, num, pipe, pid, (char *)NULL);
 						perror("exec failure!\n");
 						exit(1);
 					}
 				}
-				close(sorters_pipes[j][1]); // Close write end for splitter (splitter - sorter)
+				close(sorters_pipes[j][WRITE_END]); // Close write end for splitter (splitter - sorter)
 			}
 
 			// Parent process: SPLITTER
@@ -219,18 +233,19 @@ int main(int argc, char *argv[]) {
 			// Read the sorted arrays from pipe (sorter -> splitter)
 			for (j = 0; j < numof_sorters; j++) {
 				int count = 0;
-				while (read(sorters_pipes[j][0], &rec.custid, sizeof(int)) > 0 && rec.custid != -1) {
-					read(sorters_pipes[j][0], rec.FirstName, sizeof(rec.FirstName));
-					read(sorters_pipes[j][0], rec.LastName, sizeof(rec.LastName));
+				while (read(sorters_pipes[j][0], &rec.voter_id, sizeof(int)) > 0 && rec.voter_id != -1) {
+					read(sorters_pipes[j][0], rec.first_name, sizeof(rec.first_name));
+					read(sorters_pipes[j][0], rec.last_name, sizeof(rec.last_name));
 					read(sorters_pipes[j][0], rec.postcode, sizeof(rec.postcode));
 					sorters_results[j][count++] = rec;
 				}
 				// Read time from sorter
-				close(sorters_pipes[j][0]); // Close read end for splitter (splitter - sorter)
+				close(sorters_pipes[j][READ_END]); // Close read end for splitter (splitter - sorter)
 			}
 
 			// Merge sorted records
 			Record *final_result;
+			int prev_size = 0;
 			int current_size = sorters_numof_records[0];
 			CHECK_MALLOC_NULL(final_result = malloc(current_size * sizeof(Record)));
 			for (j = 0; j < current_size; j++) {
@@ -239,22 +254,24 @@ int main(int argc, char *argv[]) {
 	
 			for (j = 1; j < numof_sorters; j++) {
 				int count = 0;
-				current_size = sorters_numof_records[0] + sorters_numof_records[i];
-				final_result = realloc(final_result, current_size);
-				for (int h = sorters_numof_records[h - 1]; h < current_size; h++) {
+				prev_size = current_size;
+				current_size += sorters_numof_records[j];
+				final_result = realloc(final_result, current_size * sizeof(Record));
+				for (int h = prev_size; h < current_size; h++) {
 					final_result[h] = sorters_results[j][count++];
 				}
-
+				merge(&final_result, 0, prev_size - 1,  current_size - 1);
 			}
 
 			// Write the sorted array in the pipe (splitter -> root)
 			for (j = 0; j < splitters_numof_records[i]; j++) {
-				write(splitters_pipes[i][1], &final_result[i].custid, sizeof(int));
-				write(splitters_pipes[i][1], final_result[i].FirstName, sizeof(rec.FirstName));
-				write(splitters_pipes[i][1], final_result[i].LastName, sizeof(rec.LastName));
-				write(splitters_pipes[i][1], final_result[i].postcode, sizeof(rec.postcode));
+				write(splitters_pipes[i][WRITE_END], &final_result[i].voter_id, sizeof(int));
+				write(splitters_pipes[i][WRITE_END], final_result[i].first_name, sizeof(rec.first_name));
+				write(splitters_pipes[i][WRITE_END], final_result[i].last_name, sizeof(rec.last_name));
+				write(splitters_pipes[i][WRITE_END], final_result[i].postcode, sizeof(rec.postcode));
 			}
-			close(splitters_pipes[i][1]); // Close write end for splitter (splitter - root)
+			write(splitters_pipes[i][1], &stop, sizeof(int));
+			close(splitters_pipes[i][WRITE_END]); // Close write end for splitter (splitter - root)
 
 			// Free memory allocated by splitter
 			free(sorters);
@@ -271,7 +288,7 @@ int main(int argc, char *argv[]) {
 			free(final_result);
 			exit(0); // End splitter process
 		}
-		close(splitters_pipes[i][1]); // Close write end for root (root - splitter)
+		close(splitters_pipes[i][WRITE_END]); // Close write end for root (root - splitter)
 	}
 
 	// Parent process: MYSORT
@@ -285,18 +302,19 @@ int main(int argc, char *argv[]) {
 	// Read the sorted arrays from pipes (splitter -> root)
 	for (i = 0; i < k; i++) {
 		int count = 0;
-		while (read(splitters_pipes[i][0], &rec.custid, sizeof(int)) > 0 && rec.custid != -1) {
-			read(splitters_pipes[i][0], rec.FirstName, sizeof(rec.FirstName));
-			read(splitters_pipes[i][0], rec.LastName, sizeof(rec.LastName));
-			read(splitters_pipes[i][0], rec.postcode, sizeof(rec.postcode));
+		while (read(splitters_pipes[i][READ_END], &rec.voter_id, sizeof(int)) > 0 && rec.voter_id != -1) {
+			read(splitters_pipes[i][READ_END], rec.first_name, sizeof(rec.first_name));
+			read(splitters_pipes[i][READ_END], rec.last_name, sizeof(rec.last_name));
+			read(splitters_pipes[i][READ_END], rec.postcode, sizeof(rec.postcode));
 			splitters_results[i][count++] = rec;
 		}
 		// Read time from splitter
-		close(splitters_pipes[i][0]); // Close read end for root (root - splitter)
+		close(splitters_pipes[i][READ_END]); // Close read end for root (root - splitter)
 	}
 
 	// Merge sorted records
 	Record *final_result;
+	int prev_size = 0;
 	int current_size = splitters_numof_records[0];
 	CHECK_MALLOC_NULL(final_result = malloc(current_size * sizeof(Record)));
 	for (i = 0; i < current_size; i++) {
@@ -305,23 +323,26 @@ int main(int argc, char *argv[]) {
 	
 	for (i = 1; i < k; i++) {
 		int count = 0;
-		current_size = splitters_numof_records[0] + splitters_numof_records[i];
-		final_result = realloc(final_result, current_size);
-		for (int j = splitters_numof_records[i - 1]; j < current_size; j++) {
-			final_result[j] = splitters_results[i][count++];
+		prev_size = current_size;
+		current_size += splitters_numof_records[i];
+		final_result = realloc(final_result, current_size * sizeof(Record));
+		for (int j = prev_size; j < current_size; j++) {
+			final_result[prev_size] = splitters_results[i][count++];
 		}
-
+		merge(&final_result, 0, prev_size - 1,  current_size - 1);
 	}
 	
 	// Print sorted list
 	for (i = 0; i < total_records; i++) {
-		printf("%d %s %s %s\n", final_result[i].custid, final_result[i].LastName, final_result[i].FirstName, final_result[i].postcode);
+		printf("%d %s %s %s\n", final_result[i].voter_id, final_result[i].last_name, final_result[i].first_name, final_result[i].postcode);
 	}
 	printf("\n");
 
 	close(rp); // Close file pointer for root
 
 	// Free memory allocated by root
+	free(prog1);
+	free(prog2);
 	free(splitters);
 	free(splitters_pointers);
 	free(splitters_numof_records);
@@ -329,8 +350,8 @@ int main(int argc, char *argv[]) {
 		free(splitters_pipes[i]);
 	}
 	free(splitters_pipes);
-	for (j = 0; j < k; j++) {
-		free(splitters_results[j]);
+	for (i = 0; i < k; i++) {
+		free(splitters_results[i]);
 	}
 	free(splitters_results);
 	free(final_result);

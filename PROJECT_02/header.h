@@ -2,9 +2,9 @@
 #define SIZE_POST 6
 
 typedef struct {
-	int custid;
-	char LastName[SIZE_NAME];
-	char FirstName[SIZE_NAME];
+	int voter_id;
+	char last_name[SIZE_NAME];
+	char first_name[SIZE_NAME];
 	char postcode[SIZE_POST];
 } Record;
 

@@ -11,7 +11,7 @@
 int main (int argc, char *argv[]) {
 
 	// Check number of arguments
-	if (argc != 5) {
+	if (argc != 6) {
 		perror("Wrong number of arguments for selection sort!\n");
 		exit(1);
 	}
@@ -30,6 +30,9 @@ int main (int argc, char *argv[]) {
 	// Pipe
 	int pipe = atoi(argv[4]);
 
+	// Root pid
+	pid_t root_pid = atoi(argv[5]);
+
 	// Read the file
 	Record *array;
 	Record rec;
@@ -45,17 +48,17 @@ int main (int argc, char *argv[]) {
 	for (int i = 0; i < num_records; i++) {
 		int index = i;
 		for (int j = i + 1; j < num_records; j++) {
-			if (strcmp(array[j].LastName, array[index].LastName) < 0) {
+			if (strcmp(array[j].last_name, array[index].last_name) < 0) {
 				index = j;
 			}
 			// Same last name
-			else if (strcmp(array[j].LastName, array[index].LastName) == 0) {
-				if (strcmp(array[j].FirstName, array[index].FirstName) < 0) {
+			else if (strcmp(array[j].last_name, array[index].last_name) == 0) {
+				if (strcmp(array[j].first_name, array[index].first_name) < 0) {
 					index = j;
 				}
 				// Same last name and first name
-				else if (strcmp(array[j].FirstName, array[index].FirstName) == 0) {
-					if (array[j].custid < array[index].custid)
+				else if (strcmp(array[j].first_name, array[index].first_name) == 0) {
+					if (array[j].voter_id < array[index].voter_id)
 						index = j;
 				}
 			}
@@ -67,9 +70,9 @@ int main (int argc, char *argv[]) {
 
 	// Write the sorted array in the pipe
 	for (int i = 0; i < num_records; i++) {
-		write(pipe, &array[i].custid, sizeof(int));
-		write(pipe, array[i].FirstName, sizeof(rec.FirstName));
-		write(pipe, array[i].LastName, sizeof(rec.LastName));
+		write(pipe, &array[i].voter_id, sizeof(int));
+		write(pipe, array[i].first_name, sizeof(rec.first_name));
+		write(pipe, array[i].last_name, sizeof(rec.last_name));
 		write(pipe, array[i].postcode, sizeof(rec.postcode));
 	}
 
