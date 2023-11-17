@@ -10,7 +10,7 @@
 int main (int argc, char *argv[]) {
 
 	// Check number of arguments
-	if (argc != 5) {
+	if (argc != 6) {
 		perror("Wrong number of arguments for bubble sort!\n");
 		exit(1);
 	}
@@ -28,6 +28,9 @@ int main (int argc, char *argv[]) {
 
 	// Pipe
 	int pipe = atoi(argv[4]);
+
+	// Root pid
+	pid_t root_pid = atoi(argv[5]);
 
 	// Read the file
 	Record *array;
@@ -74,7 +77,7 @@ int main (int argc, char *argv[]) {
 	
 	int ret = 1, stop = -1;
 	write(pipe, &stop, sizeof(int));
-	write(pipe, &ret, sizeof(int));
+//	write(pipe, &ret, sizeof(int));
 
 	close(rp); // Close file pointer for sorter
 	close(pipe); // Close write end for sorter

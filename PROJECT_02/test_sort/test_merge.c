@@ -7,15 +7,27 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-//#include <sys/wait.h>
+#include <sys/wait.h>
 #include "header.h"
+
+void merge(Record **, int, int, int);
 
 int main() {
 
-	int i, k = 7, rp, size, total_records, stat;
+	int i, k = 4, rp, size, total_records, stat, status;
 	Record rec;
 	struct stat buffer;
-	char *data_file = "voters5000.bin";
+	char *data_file = "voters50.bin";
+	pid_t root_pid = getpid();
+	char *sort1 = "bubble_sort", *sort2 = "selection_sort", *prog1, *prog2;
+
+	// Preparing the strings for the execution of the programs
+	CHECK_MALLOC_NULL(prog1 = malloc((strlen(sort1) + 3) * sizeof(char)));
+	CHECK_MALLOC_NULL(prog2 = malloc((strlen(sort2) + 3) * sizeof(char)));
+	strcpy(prog1, "./");
+	strcat(prog1, sort1);
+	strcpy(prog2, "./");
+	strcat(prog2, sort2);
 
 	// Open binary data file
 	CHECK_FILE(rp = open(data_file, O_RDONLY));
@@ -73,10 +85,11 @@ int main() {
 
 	// Create k children
 	for (i = 0; i < k; i++) {
-		char file_pointer[10], num_recs[10], pipe[10];
+		char file_pointer[10], num_recs[10], pipe[10], pid[10];
 		snprintf(file_pointer, sizeof(file_pointer), "%d", splitters_pointers[i]);
 		snprintf(num_recs, sizeof(num_recs), "%d", splitters_numof_records[i]);
 		snprintf(pipe, sizeof(pipe), "%d", splitters_pipes[i][1]);
+		snprintf(pid, sizeof(pid), "%d", root_pid);
 
 		pid_t child = fork();
 		if (child == -1) {
@@ -87,9 +100,9 @@ int main() {
 		else if (child == 0) {
 			close(splitters_pipes[i][0]); // Close read end for child
 			if (i % 2 == 0)
-				execl("./selection_sort", "./selection_sort", data_file, file_pointer, num_recs, pipe, (char *)NULL);
+				execl(prog1, prog1, data_file, file_pointer, num_recs, pipe, pid, (char *)NULL);
 			else
-				execl("./bubble_sort", "./bubble_sort", data_file, file_pointer, num_recs, pipe, (char *)NULL);
+				execl(prog2, prog2, data_file, file_pointer, num_recs, pipe, pid, (char *)NULL);
 
 			perror("exec failure!\n");
 			exit(1);
@@ -107,6 +120,7 @@ int main() {
 	// Read data from pipes
 	for (i = 0; i < k; i++) {
 		int count = 0;
+		waitpid(splitters[i], &status, WNOHANG);
 		while (read(splitters_pipes[i][0], &rec.custid, sizeof(int)) > 0 && rec.custid != -1) {
 			read(splitters_pipes[i][0], rec.FirstName, sizeof(rec.FirstName));
 			read(splitters_pipes[i][0], rec.LastName, sizeof(rec.LastName));
@@ -119,31 +133,35 @@ int main() {
 
 	// Merge results
 	Record *final_result;
+	int prev_size = 0;
 	int current_size = splitters_numof_records[0];
 	CHECK_MALLOC_NULL(final_result = malloc(current_size * sizeof(Record)));
 	for (i = 0; i < current_size; i++) {
 		final_result[i] = splitters_results[0][i];
 	}
-	
+
 	for (i = 1; i < k; i++) {
 		int count = 0;
-		current_size = splitters_numof_records[0] + splitters_numof_records[i];
-		final_result = realloc(final_result, current_size);
-		for (int j = splitters_numof_records[i - 1]; j < current_size; j++) {
+		prev_size = current_size;
+		current_size += splitters_numof_records[i];
+		final_result = realloc(final_result, current_size * sizeof(Record));
+		for (int j = prev_size; j < current_size; j++) {
 			final_result[j] = splitters_results[i][count++];
 		}
-
+//		merge(&final_result, 0, prev_size - 1,  current_size - 1);
 	}
 
 	// Print final sorted list
 	for (i = 0; i < total_records; i++) {
-		printf("%d %s %s %s\n", rec.custid, rec.LastName, rec.FirstName, rec.postcode);
+		printf("%d %s %s %s\n", final_result[i].custid, final_result[i].LastName, final_result[i].FirstName, final_result[i].postcode);
 	}
 	printf("\n");
 
 	close(rp); // Close file pointer for parent
 
 	// Free memory allocated by root
+	free(prog1);
+	free(prog2);
 	free(splitters);
 	free(splitters_pointers);
 	free(splitters_numof_records);
@@ -151,6 +169,11 @@ int main() {
 		free(splitters_pipes[i]);
 	}
 	free(splitters_pipes);
+	for (i = 0; i < k; i++) {
+		free(splitters_results[i]);
+	}
+	free(splitters_results);
+	free(final_result);
 
 	return 0;
 }

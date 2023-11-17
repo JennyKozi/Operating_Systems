@@ -16,6 +16,7 @@ int main() {
 	Record rec;
 	struct stat buffer;
 	char *data_file = "voters50.bin";
+	pid_t root_pid = getpid();
 
 	// Open binary data file
 	CHECK_FILE(rp = open(data_file, O_RDONLY));

@@ -79,7 +79,7 @@ int main (int argc, char *argv[]) {
 		write(pipe, array[i].postcode, sizeof(rec.postcode));
 	}
 
-	int stop;
+	int stop = -1;
 	write(pipe, &stop, sizeof(int));
 	
 	close(rp); // Close file pointer for sorter

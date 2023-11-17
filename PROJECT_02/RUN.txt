@@ -5,3 +5,6 @@
 ./mysort -k 5 -e2 bubblesort -i voters5000.bin -e1 quicksort
 
 ./mysort -e2 bubblesort -k 6 -i voters50000.bin -e1 quicksort
+
+
+valgrind --trace-children=yes ./mysort -i tests/voters50000.bin -k 4 -e1 ./sorter1 -e2 ./sorter2 > /dev/null
