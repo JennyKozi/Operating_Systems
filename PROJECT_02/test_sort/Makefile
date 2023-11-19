@@ -5,19 +5,13 @@ selection_sort: selection_sort.o
 
 selection_sort.o: selection_sort.c
 	gcc -g3 -c -o selection_sort.o selection_sort.c
-	
+
 bubble_sort: bubble_sort.o
 	gcc -o bubble_sort bubble_sort.o
 
 bubble_sort.o: bubble_sort.c
 	gcc -g3 -c -o bubble_sort.o bubble_sort.c
 
-#merge_sort: merge_sort.o
-#	gcc -o merge_sort merge_sort.o
-
-#merge_sort.o: merge_sort.c
-#	gcc -c -o merge_sort.o merge_sort.c
-	
 ###################################################
 
 test: test.o
@@ -36,13 +30,13 @@ merge.o: merge.c
 	gcc -g3 -c -o merge.o merge.c
 
 ###################################################
-	
+
 run_test: test
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./test
 
 run: test_merge
 	./test_merge
-	
+
 time: test_merge
 	time ./test_merge
 

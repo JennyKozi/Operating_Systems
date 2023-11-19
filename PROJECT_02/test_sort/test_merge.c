@@ -17,7 +17,7 @@ int main() {
 	int i, k = 4, rp, size, total_records, stat, status;
 	Record rec;
 	struct stat buffer;
-	char *data_file = "voters50.bin";
+	char *data_file = "voters50000.bin";
 	pid_t root_pid = getpid();
 	char *sort1 = "bubble_sort", *sort2 = "selection_sort", *prog1, *prog2;
 
@@ -49,10 +49,17 @@ int main() {
 	// Useful info for the splitters
 	pid_t *splitters;
 	int *splitters_pointers, *splitters_numof_records, **splitters_pipes;
+	double **sorters_time;
 	CHECK_MALLOC_NULL(splitters = malloc(k * sizeof(pid_t)));
 	CHECK_MALLOC_NULL(splitters_pointers = malloc(k * sizeof(int)));
 	CHECK_MALLOC_NULL(splitters_numof_records = malloc(k * sizeof(int)));
 	CHECK_MALLOC_NULL(splitters_pipes = malloc(k * sizeof(int *)));
+	CHECK_MALLOC_NULL(sorters_time = malloc(k * sizeof(double *)));
+
+	// Matrix for real time and cpu time of each sorter
+	for (i = 0; i < k; i++) {
+		CHECK_MALLOC_NULL(sorters_time[i] = malloc(2 * sizeof(double)));
+	}
 
 	// Create pipes for splitters
 	for (i = 0; i < k; i++) {
@@ -91,13 +98,13 @@ int main() {
 		snprintf(pipe, sizeof(pipe), "%d", splitters_pipes[i][1]);
 		snprintf(pid, sizeof(pid), "%d", root_pid);
 
-		pid_t child = fork();
-		if (child == -1) {
+		splitters[i] = fork();
+		if (splitters[i] == -1) {
 			perror("Failed to fork!\n");
 			exit(1);
 		}
 		// CHILD: SORT
-		else if (child == 0) {
+		else if (splitters[i] == 0) {
 			close(splitters_pipes[i][0]); // Close read end for child
 			if (i % 2 == 0)
 				execl(prog1, prog1, data_file, file_pointer, num_recs, pipe, pid, (char *)NULL);
@@ -128,6 +135,8 @@ int main() {
 			splitters_results[i][count++] = rec;
 		}
 		// Read time from child
+		read(splitters_pipes[i][0], &sorters_time[i][0], sizeof(double)); // Real time
+		read(splitters_pipes[i][0], &sorters_time[i][1], sizeof(double)); // CPU time
 		close(splitters_pipes[i][0]); // Close read end for parent
 	}
 
@@ -148,16 +157,21 @@ int main() {
 		for (int j = prev_size; j < current_size; j++) {
 			final_result[j] = splitters_results[i][count++];
 		}
-//		merge(&final_result, 0, prev_size - 1,  current_size - 1);
+		merge(&final_result, 0, prev_size - 1,  current_size - 1);
 	}
 
 	// Print final sorted list
 	for (i = 0; i < total_records; i++) {
-		printf("%d %s %s %s\n", final_result[i].custid, final_result[i].LastName, final_result[i].FirstName, final_result[i].postcode);
+		printf("%s %s %d %s\n", final_result[i].LastName, final_result[i].FirstName, final_result[i].custid, final_result[i].postcode);
 	}
 	printf("\n");
 
 	close(rp); // Close file pointer for parent
+
+	// Print time of sorters
+	for (i = 0; i < k; i++) {
+		printf("Sorter %d: Real time: %f, CPU time: %f\n", i, sorters_time[i][0], sorters_time[i][1]);
+	}
 
 	// Free memory allocated by root
 	free(prog1);
@@ -173,6 +187,10 @@ int main() {
 		free(splitters_results[i]);
 	}
 	free(splitters_results);
+	for (i = 0; i < k; i++) {
+		free(sorters_time[i]);
+	}
+	free(sorters_time);
 	free(final_result);
 
 	return 0;

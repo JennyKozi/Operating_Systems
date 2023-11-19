@@ -26,12 +26,12 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int i, j, k, total_records, rp, stat, size, status, stop = -1;
-	long lSize;
+	int i, j, k, total_records, rp, stat, file_size, status, stop = -1;
+	double time;
 	char *data_file, *sort1, *sort2, *prog1, *prog2;
 	Record rec;
 	struct stat buffer;
-	pid_t root_pid = getpid();
+	pid_t root_pid = getpid(); // pid of the process root
 
 	// Check that the flags are correct
 	for (i = 1; i <= 7; i += 2) {
@@ -79,8 +79,7 @@ int main(int argc, char *argv[]) {
 	strcpy(prog2, "./");
 	strcat(prog2, sort2);
 
-	// Open binary data file
-	CHECK_FILE(rp = open(data_file, O_RDONLY));
+	CHECK_FILE(rp = open(data_file, O_RDONLY)); // Open binary data file
 
 	// Get number of records
 	stat = fstat(rp, &buffer);
@@ -89,16 +88,18 @@ int main(int argc, char *argv[]) {
 		close(rp);
 		exit(1);
 	}
-	size = buffer.st_size;
-	total_records = (int)size / sizeof(rec);
-	lseek(rp, 0, SEEK_SET); // Set rp in the beginning of the file
+	close(rp); // Close file pointer for root
+	file_size = buffer.st_size;
+	total_records = (int)file_size / sizeof(rec); // Total records in the file
 
 	int load_splitter = total_records / k; // Number of records for one splitter
 	int remaining_load_splitters = total_records % k; // The first children (spliters) will get one extra record
+	int total_sorters = k * (k + 1) / 2; // Number of total sorters
 
 	// Useful info for the splitters
 	pid_t *splitters;
 	int *splitters_pointers, *splitters_numof_records, **splitters_pipes;
+
 	CHECK_MALLOC_NULL(splitters = malloc(k * sizeof(pid_t)));
 	CHECK_MALLOC_NULL(splitters_pointers = malloc(k * sizeof(int)));
 	CHECK_MALLOC_NULL(splitters_numof_records = malloc(k * sizeof(int)));
@@ -154,10 +155,17 @@ int main(int argc, char *argv[]) {
 			// Useful info for the sorters of this splitter
 			pid_t *sorters;
 			int *sorters_pointers, *sorters_numof_records, **sorters_pipes;
+			double **sorters_time;
 			CHECK_MALLOC_NULL(sorters = malloc(numof_sorters * sizeof(pid_t)));
 			CHECK_MALLOC_NULL(sorters_pointers = malloc(numof_sorters * sizeof(int)));
 			CHECK_MALLOC_NULL(sorters_numof_records = malloc(numof_sorters * sizeof(int)));
 			CHECK_MALLOC_NULL(sorters_pipes = malloc(numof_sorters * sizeof(int *)));
+			CHECK_MALLOC_NULL(sorters_time = malloc(numof_sorters * sizeof(double *)));
+
+			// Matrix for real time and cpu time of each sorter
+			for (j = 0; j < numof_sorters; j++) {
+				CHECK_MALLOC_NULL(sorters_time[j] = malloc(2 * sizeof(double)));
+			}
 
 			// Create pipes for splitters
 			for (j = 0; j < numof_sorters; j++) {
@@ -230,7 +238,7 @@ int main(int argc, char *argv[]) {
 				CHECK_MALLOC_NULL(sorters_results[j] = malloc(sorters_numof_records[j] * sizeof(Record)));
 			}
 
-			// Read the sorted arrays from pipe (sorter -> splitter)
+			// Read the sorted records from pipe (sorter -> splitter)
 			for (j = 0; j < numof_sorters; j++) {
 				waitpid(sorters[j], &status, WNOHANG); // Wait for sorter process to finish
 				int count = 0;
@@ -241,6 +249,8 @@ int main(int argc, char *argv[]) {
 					sorters_results[j][count++] = rec;
 				}
 				// Read time from sorter
+				read(sorters_pipes[j][READ_END], &sorters_time[j][0], sizeof(double)); // Real time
+				read(sorters_pipes[j][READ_END], &sorters_time[j][1], sizeof(double)); // CPU time
 				close(sorters_pipes[j][READ_END]); // Close read end for splitter (splitter - sorter)
 			}
 
@@ -272,6 +282,12 @@ int main(int argc, char *argv[]) {
 				write(splitters_pipes[i][WRITE_END], final_result[j].postcode, sizeof(rec.postcode));
 			}
 			write(splitters_pipes[i][WRITE_END], &stop, sizeof(int));
+
+			// Write the time of each sorter (splitter -> root)
+			for (j = 0; j < numof_sorters; j++) {
+				write(splitters_pipes[i][WRITE_END], &sorters_time[j][0], sizeof(double)); // Real time
+				write(splitters_pipes[i][WRITE_END], &sorters_time[j][1], sizeof(double)); // CPU time
+			}
 			close(splitters_pipes[i][WRITE_END]); // Close write end for splitter (splitter - root)
 
 			// Free memory allocated by splitter
@@ -286,21 +302,46 @@ int main(int argc, char *argv[]) {
 				free(sorters_results[j]);
 			}
 			free(sorters_results);
+			for (j = 0; j < numof_sorters; j++) {
+				free(sorters_time[j]);
+			}
+			free(sorters_time);
 			free(final_result);
+
+			// Free memory allocated by root
+			free(prog1);
+			free(prog2);
+			free(splitters);
+			free(splitters_pointers);
+			free(splitters_numof_records);
+			for (i = 0; i < k; i++) {
+				free(splitters_pipes[i]);
+			}
+			free(splitters_pipes);
+	
 			exit(0); // End splitter process
 		}
 		close(splitters_pipes[i][WRITE_END]); // Close write end for root (root - splitter)
 	}
 
 	// Parent process: MYSORT
-	printf("\n");
+	double **splitters_time;
 	Record **splitters_results;
+
+	// Matrix for real time and CPU time of each sorter
+	CHECK_MALLOC_NULL(splitters_time = malloc(total_sorters * sizeof(double *)));
+	for (i = 0; i < total_sorters; i++) {
+		CHECK_MALLOC_NULL(splitters_time[i] = malloc(2 * sizeof(double)));
+	}
+
+	// Matrix for the results of the splitters
 	CHECK_MALLOC_NULL(splitters_results = malloc(k * sizeof(Record *)));
 	for (i = 0; i < k; i++) {
 		CHECK_MALLOC_NULL(splitters_results[i] = malloc(splitters_numof_records[i] * sizeof(Record)));
 	}
 
-	// Read the sorted arrays from pipes (splitter -> root)
+	// Read the sorted records from pipes (splitter -> root)
+	int t = 0;
 	for (i = 0; i < k; i++) {
 		waitpid(splitters[i], &status, WNOHANG); // Wait for splitter process to finish
 		int count = 0;
@@ -311,6 +352,11 @@ int main(int argc, char *argv[]) {
 			splitters_results[i][count++] = rec;
 		}
 		// Read time from splitter
+		while (read(splitters_pipes[i][READ_END], &time, sizeof(double)) > 0) {
+			splitters_time[t][0] = time; // Real time
+			read(splitters_pipes[i][READ_END], &splitters_time[t][1], sizeof(double)); // CPU time
+			t++;
+		}
 		close(splitters_pipes[i][READ_END]); // Close read end for root (root - splitter)
 	}
 
@@ -335,12 +381,17 @@ int main(int argc, char *argv[]) {
 	}
 	
 	// Print sorted list
+	printf("\n");
 	for (i = 0; i < total_records; i++) {
 		printf("%d %s %s %s\n", final_result[i].voter_id, final_result[i].last_name, final_result[i].first_name, final_result[i].postcode);
 	}
 	printf("\n");
 
-	close(rp); // Close file pointer for root
+	// Print time of sorters
+	for (i = 0; i < total_sorters; i++) {
+		printf("Sorter %d: Real time: %f, CPU time: %f\n", i, splitters_time[i][0], splitters_time[i][1]);
+	}
+	printf("\n");
 
 	// Free memory allocated by root
 	free(prog1);
@@ -356,6 +407,10 @@ int main(int argc, char *argv[]) {
 		free(splitters_results[i]);
 	}
 	free(splitters_results);
+	for (i = 0; i < total_sorters; i++) {
+		free(splitters_time[i]);
+	}
+	free(splitters_time);
 	free(final_result);
 
 	return 0;

@@ -6,9 +6,18 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+# include <sys/times.h>
 #include "header.h"
 
 int main (int argc, char *argv[]) {
+
+	// Variables to count time
+	double cpu_time, t1, t2, ret_realtime, ret_cputime, tics_per_sec;
+	struct tms tb1, tb2;
+	int stop = -1;
+
+	tics_per_sec = (double)sysconf(_SC_CLK_TCK);
+	t1 = (double)times(&tb1);
 
 	// Check number of arguments
 	if (argc != 6) {
@@ -75,13 +84,21 @@ int main (int argc, char *argv[]) {
 		write(pipe, array[i].last_name, sizeof(rec.last_name));
 		write(pipe, array[i].postcode, sizeof(rec.postcode));
 	}
-
-	int stop = -1;
 	write(pipe, &stop, sizeof(int));
 
-	close(rp); // Close file for sorter
-	close(pipe); // Close write end for sorter
+	close(rp); // Close file pointer for sorter
 	free(array); // Free memory
+
+	// Calculate time
+	t2 = (double)times(&tb2);
+	cpu_time = (double)((tb2.tms_utime + tb2.tms_stime) - (tb1.tms_utime + tb1.tms_stime));
+	ret_realtime = (double)((t2 - t1) / tics_per_sec);
+	ret_cputime = (double)(cpu_time / tics_per_sec);
+
+	write(pipe, &ret_realtime, sizeof(double)); // Return real time for sorter
+	write(pipe, &ret_cputime, sizeof(double)); // Return CPU time for sorter
+
+	close(pipe); // Close write end for sorter
 
 	return 0;
 }
