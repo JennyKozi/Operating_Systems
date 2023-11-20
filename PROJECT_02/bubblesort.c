@@ -102,6 +102,7 @@ int main (int argc, char *argv[]) {
 	write(pipe, &ret_cputime, sizeof(double)); // Return CPU time for sorter
 
 	close(pipe); // Close write end for sorter
+	kill(root_pid, SIGUSR2); // Send signal USR2 to root
 
 	return 0;
 }

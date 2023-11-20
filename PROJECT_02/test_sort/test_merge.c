@@ -10,14 +10,18 @@
 #include <sys/wait.h>
 #include "header.h"
 
+void usr1_handler();
+void usr2_handler();
 void merge(Record **, int, int, int);
+
+int count_usr1 = 0, count_usr2 = 0;
 
 int main() {
 
 	int i, k = 4, rp, size, total_records, stat, status;
 	Record rec;
 	struct stat buffer;
-	char *data_file = "voters50000.bin";
+	char *data_file = "voters500.bin";
 	pid_t root_pid = getpid();
 	char *sort1 = "bubble_sort", *sort2 = "selection_sort", *prog1, *prog2;
 
@@ -92,6 +96,7 @@ int main() {
 
 	// Create k children
 	for (i = 0; i < k; i++) {
+
 		char file_pointer[10], num_recs[10], pipe[10], pid[10];
 		snprintf(file_pointer, sizeof(file_pointer), "%d", splitters_pointers[i]);
 		snprintf(num_recs, sizeof(num_recs), "%d", splitters_numof_records[i]);
@@ -103,6 +108,7 @@ int main() {
 			perror("Failed to fork!\n");
 			exit(1);
 		}
+
 		// CHILD: SORT
 		else if (splitters[i] == 0) {
 			close(splitters_pipes[i][0]); // Close read end for child
@@ -114,6 +120,8 @@ int main() {
 			perror("exec failure!\n");
 			exit(1);
 		}
+		signal(SIGUSR1, usr1_handler);
+		signal(SIGUSR2, usr2_handler);
 		close(splitters_pipes[i][1]); // Close write end for parent
 	}
 
@@ -161,8 +169,9 @@ int main() {
 	}
 
 	// Print final sorted list
+	printf("\n");
 	for (i = 0; i < total_records; i++) {
-		printf("%s %s %d %s\n", final_result[i].LastName, final_result[i].FirstName, final_result[i].custid, final_result[i].postcode);
+		printf("%-12s %-12s %-6d %-3s\n", final_result[i].LastName, final_result[i].FirstName, final_result[i].custid, final_result[i].postcode);
 	}
 	printf("\n");
 
@@ -172,6 +181,11 @@ int main() {
 	for (i = 0; i < k; i++) {
 		printf("Sorter %d: Real time: %f, CPU time: %f\n", i, sorters_time[i][0], sorters_time[i][1]);
 	}
+	printf("\n");
+
+	// Print number of signals received from splitters and sorters
+	printf("USR1 signals received: %d\n", count_usr1);
+	printf("USR2 signals received: %d\n\n", count_usr2);
 
 	// Free memory allocated by root
 	free(prog1);
@@ -194,4 +208,15 @@ int main() {
 	free(final_result);
 
 	return 0;
+}
+
+// Handlers for signals
+void usr1_handler() {
+	signal(SIGUSR1, usr1_handler);
+	count_usr1++;
+}
+
+void usr2_handler() {
+	signal(SIGUSR2, usr2_handler);
+	count_usr2++;
 }

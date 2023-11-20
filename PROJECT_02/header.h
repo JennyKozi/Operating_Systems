@@ -3,8 +3,8 @@
 
 typedef struct {
 	int voter_id;
-	char last_name[SIZE_NAME];
 	char first_name[SIZE_NAME];
+	char last_name[SIZE_NAME];
 	char postcode[SIZE_POST];
 } Record;
 

@@ -13,8 +13,13 @@
 #define READ_END 0
 #define WRITE_END 1
 
+void usr1_handler();
+void usr2_handler();
 static int Check_Int(char *);
 void merge(Record **, int, int, int);
+
+// Global variables to count signals received by root
+int count_usr1 = 0, count_usr2 = 0;
 
 int main(int argc, char *argv[]) {
 
@@ -136,6 +141,7 @@ int main(int argc, char *argv[]) {
 
 	// Create k splitters with fork
 	for (i = 0; i < k; i++) {
+
 		splitters[i] = fork();
 		if (splitters[i] == -1) {
 			perror("Failed to fork!\n");
@@ -228,7 +234,11 @@ int main(int argc, char *argv[]) {
 						exit(1);
 					}
 				}
-				close(sorters_pipes[j][WRITE_END]); // Close write end for splitter (splitter - sorter)
+
+				// Splitter
+				else {
+					close(sorters_pipes[j][WRITE_END]); // Close write end for splitter (splitter - sorter)
+				}
 			}
 
 			// Parent process: SPLITTER
@@ -318,10 +328,17 @@ int main(int argc, char *argv[]) {
 				free(splitters_pipes[i]);
 			}
 			free(splitters_pipes);
-	
+
+			kill(root_pid, SIGUSR1); // Send signal USR1 to root
 			exit(0); // End splitter process
 		}
-		close(splitters_pipes[i][WRITE_END]); // Close write end for root (root - splitter)
+
+		// Root
+		else {
+			signal(SIGUSR1, usr1_handler); // Set signal handler for root (USR1)
+			signal(SIGUSR2, usr2_handler); // Set signal handler for root (USR2)
+			close(splitters_pipes[i][WRITE_END]); // Close write end for root (root - splitter)
+		}
 	}
 
 	// Parent process: MYSORT
@@ -383,7 +400,7 @@ int main(int argc, char *argv[]) {
 	// Print sorted list
 	printf("\n");
 	for (i = 0; i < total_records; i++) {
-		printf("%d %s %s %s\n", final_result[i].voter_id, final_result[i].last_name, final_result[i].first_name, final_result[i].postcode);
+		printf("%-12s %-12s %-6d   %s\n", final_result[i].last_name, final_result[i].first_name, final_result[i].voter_id, final_result[i].postcode);
 	}
 	printf("\n");
 
@@ -392,6 +409,10 @@ int main(int argc, char *argv[]) {
 		printf("Sorter %d: Real time: %f, CPU time: %f\n", i, splitters_time[i][0], splitters_time[i][1]);
 	}
 	printf("\n");
+
+	// Print number of signals received from splitters and sorters
+	printf("USR1 signals received: %d\n", count_usr1);
+	printf("USR2 signals received: %d\n\n", count_usr2);
 
 	// Free memory allocated by root
 	free(prog1);
@@ -435,4 +456,15 @@ static int Check_Int(char *string) {
 		return 0;
 	}
 	return 1;
+}
+
+// Handlers for signals
+void usr1_handler() {
+	signal(SIGUSR1, usr1_handler);
+	count_usr1++;
+}
+
+void usr2_handler() {
+	signal(SIGUSR2, usr2_handler);
+	count_usr2++;
 }

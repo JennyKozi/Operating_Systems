@@ -27,7 +27,7 @@ clean: mysort
 	rm -rf mysort mysort.o merge.o selectionsort selectionsort.o bubblesort bubblesort.o
 
 run: mysort
-	./mysort -i voters50000.bin -k 7 -e1 bubblesort -e2 selectionsort
+	./mysort -i voters500.bin -k 7 -e1 bubblesort -e2 selectionsort
 
 time: mysort
 	time ./mysort -i voters100000.bin -k 20 -e1 bubblesort -e2 selectionsort
