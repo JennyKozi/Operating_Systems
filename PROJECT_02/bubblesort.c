@@ -9,7 +9,7 @@
 # include <sys/times.h>
 #include "header.h"
 
-int main (int argc, char *argv[]) {
+void main (int argc, char *argv[]) {
 
 	// Variables to count time
 	double cpu_time, t1, t2, ret_realtime, ret_cputime, tics_per_sec;
@@ -104,5 +104,5 @@ int main (int argc, char *argv[]) {
 	close(pipe); // Close write end for sorter
 	kill(root_pid, SIGUSR2); // Send signal USR2 to root
 
-	return 0;
+	exit(0);
 }
