@@ -21,6 +21,7 @@ void main (int argc, char *argv[]) {
 	bool flag_many_records = false;
 	char *filename, temp_string[20];
 
+	// Get arguments from command line
 	for (i = 1; i < argc; i += 2) {
 		
 		// Datafile
@@ -97,6 +98,8 @@ void main (int argc, char *argv[]) {
 	total_records = (int)file_size / sizeof(rec); // Total records in the file
 
 //	printf("recid min: %d \nrecid max: %d \ntime: %f \nshm id: %d\n", recid_min, recid_max, time, shmid);
+
+	//
 
 	exit(0);
 }
