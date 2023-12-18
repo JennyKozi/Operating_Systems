@@ -1,18 +1,8 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/wait.h>
 #include "header.h"
 
 #define NUM_ARGS_READER 10
 #define NUM_ARGS_WRITER 12
+# define SEGMENTPERM 0666
 
 volatile sig_atomic_t fl_s = 0;
 
@@ -28,20 +18,51 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int shmid = 50, count_readers = 0, count_writers = 0, index = 0, status;
+	int count_readers = 0, count_writers = 0, index = 0, status;
 	char *exec_file, *reader_args[NUM_ARGS_READER], *writer_args[NUM_ARGS_WRITER], temp_string[SIZE];
 	pid_t *children_pids;
 	FILE *fp;
 
-	// Semaphores
+	// Create shared memory segment
+	sem_t *sp;
+	shared_mem_seg *sh_mem;
+	int retval, shmid, err;
 
-	// Shared memory segment
+	shmid = shmget(IPC_PRIVATE, sizeof(shared_mem_seg), SEGMENTPERM);
+	if (shmid == (void *) -1) {
+		perror("Can't create shared memory segment!\n");
+		exit(1);
+	}
+	else {
+		printf("Allocated %d\n", shmid);
+	}
+
+	// Attach the segment
+	sh_mem = shmat(shmid, (void *) 0, 0);
+	if (sh_mem == (void *) -1) {
+		perror("Can't attach shared memory segment!\n");
+		exit(1);
+	}
+
+	// Initialize data of shared memory segment
+	(*sh_mem).num_readers = 0;
+	(*sh_mem).num_writers = 0;
+	(*sh_mem).num_recs_processed = 0;
+
+	// Initialize the semaphore
+/*
+	retval = sem_init(sp, 1, 2);
+	if (retval != 0) {
+		perror("Couldn't initialize the semaphore!\n");
+		exit(1);
+	}
+*/
 
 	// Allocate memory
 	for (int i = 0; i < NUM_ARGS_READER - 1; i++) {
 		CHECK_MALLOC_NULL(reader_args[i] = malloc(SIZE * sizeof(char)));
 	}
-	for (int i = 0; i < NUM_ARGS_WRITER - 1; i ++) {
+	for (int i = 0; i < NUM_ARGS_WRITER - 1; i++) {
 		CHECK_MALLOC_NULL(writer_args[i] = malloc(SIZE * sizeof(char)));
 	}
 	CHECK_MALLOC_NULL(children_pids = malloc(sizeof(pid_t)));
@@ -133,6 +154,15 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i < count_readers + count_writers; i++) {
 		wait(&status);
 	}
+
+//	sem_destroy(sp); // Destroy semaphore
+
+	// Destroy shared memory segment
+	err = shmctl(shmid, IPC_RMID, 0);
+	if (err == -1)
+		perror("Can't remove shared memory segment!\n");
+	else
+		printf("Removed shared memory segment %d\n", err);
 
 	// Free memory
 	for (int i = 0; i < NUM_ARGS_READER - 1; i++) {

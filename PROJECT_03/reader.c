@@ -1,12 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdbool.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include "header.h"
 
 void main (int argc, char *argv[]) {
@@ -79,27 +70,22 @@ void main (int argc, char *argv[]) {
 		}
 	}
 
-	// Binary datafile
-	int rp, total_records, stat, file_size;
-	Record rec;
-	struct stat buffer;
+	// Attach shared memory segment
+	shared_mem_seg *sh_mem;
+	int retval, id, err;
 
-	CHECK_FILE(rp = open(filename, O_RDONLY)); // Open file
-
-	// Get number of records
-	stat = fstat(rp, &buffer);
-	if (stat != 0) {
-		perror("Error reading file!\n");
-		close(rp);
+	sh_mem = shmat(shmid, (void *) 0, 0);
+	if (sh_mem == (void *) -1) {
+		perror("Can't attach shared memory segment!\n");
 		exit(1);
 	}
-	close(rp); // Close file pointer
-	file_size = buffer.st_size;
-	total_records = (int)file_size / sizeof(rec); // Total records in the file
 
-//	printf("recid min: %d \nrecid max: %d \ntime: %f \nshm id: %d\n", recid_min, recid_max, time, shmid);
+	//	printf("recid min: %d \nrecid max: %d \ntime: %f \nshm id: %d\n", recid_min, recid_max, time, shmid);
 
-	//
+	// Detach shared memory segment
+	err = shmdt((void *) sh_mem);
+	if (err == -1)
+		perror ("Reader detaches shared memory segment.\n");
 
 	exit(0);
 }

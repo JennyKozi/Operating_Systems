@@ -1,19 +1,19 @@
 all: myprog reader writer
 
 myprog: myprog.o
-	gcc -o myprog myprog.o
+	gcc -o myprog myprog.o -lrt
 	
 myprog.o: myprog.c
 	gcc -c -o myprog.o myprog.c
 
 reader: reader.o
-	gcc -o reader reader.o
+	gcc -o reader reader.o -lrt
 
 reader.o: reader.c
 	gcc -c -o reader.o reader.c
 
 writer: writer.o
-	gcc -o writer writer.o
+	gcc -o writer writer.o -lrt
 	
 writer.o: writer.c
 	gcc -c -o writer.o writer.c
