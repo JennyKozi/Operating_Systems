@@ -8,6 +8,7 @@ volatile sig_atomic_t fl_s = 0;
 
 // Handler for SIGUSR1
 void handle_sigusr1(int signum) {
+	signal(SIGUSR1, handle_sigusr1);
 	fl_s = 1;
 }
 
@@ -19,7 +20,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	int count_readers = 0, count_writers = 0, index = 0, status;
-	char *exec_file, *reader_args[NUM_ARGS_READER], *writer_args[NUM_ARGS_WRITER], temp_string[SIZE];
+	char *exec_file, *reader_args[NUM_ARGS_READER], *writer_args[NUM_ARGS_WRITER], temp_string[NAME_SIZE];
 	pid_t *children_pids;
 	FILE *fp;
 
@@ -28,52 +29,48 @@ int main(int argc, char *argv[]) {
 	shared_mem_seg *sh_mem;
 	int retval, shmid, err;
 
-	shmid = shmget(IPC_PRIVATE, sizeof(shared_mem_seg), SEGMENTPERM);
-	if (shmid == (void *) -1) {
-		perror("Can't create shared memory segment!\n");
-		exit(1);
-	}
-	else {
-		printf("Allocated %d\n", shmid);
-	}
+	CHECK_CALL(shmid = shmget(IPC_PRIVATE, sizeof(shared_mem_seg), SEGMENTPERM), -1);
+	printf("Allocated %d\n", shmid);
 
 	// Attach the segment
-	sh_mem = shmat(shmid, (void *) 0, 0);
-	if (sh_mem == (void *) -1) {
-		perror("Can't attach shared memory segment!\n");
-		exit(1);
-	}
+	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), (void *) -1);
 
 	// Initialize data of shared memory segment
-	(*sh_mem).num_readers = 0;
-	(*sh_mem).num_writers = 0;
-	(*sh_mem).num_recs_processed = 0;
+	(*sh_mem).total_readers = 0;
+	(*sh_mem).total_writers = 0;
+	(*sh_mem).total_recs_processed = 0;
 
-	// Initialize the semaphore
-/*
-	retval = sem_init(sp, 1, 2);
+	// Initialize the arrays
+	for (int i = 0; i < ARRAY_SIZE; i++) {
+		sh_mem->readers_pid[i] = 0;
+		sh_mem->writers_pid[i] = 0;
+	}
+
+	// Initialize the semaphores
+	retval = sem_init(&(sh_mem->sem_new_reader), 1, 1);
 	if (retval != 0) {
 		perror("Couldn't initialize the semaphore!\n");
 		exit(1);
 	}
-*/
+
+	retval = sem_init(&(sh_mem->sem_new_writer), 1, 1);
+	if (retval != 0) {
+		perror("Couldn't initialize the semaphore!\n");
+		exit(1);
+	}
 
 	// Allocate memory
 	for (int i = 0; i < NUM_ARGS_READER - 1; i++) {
-		CHECK_MALLOC_NULL(reader_args[i] = malloc(SIZE * sizeof(char)));
+		CHECK_CALL(reader_args[i] = malloc(NAME_SIZE * sizeof(char)), NULL);
 	}
 	for (int i = 0; i < NUM_ARGS_WRITER - 1; i++) {
-		CHECK_MALLOC_NULL(writer_args[i] = malloc(SIZE * sizeof(char)));
+		CHECK_CALL(writer_args[i] = malloc(NAME_SIZE * sizeof(char)), NULL);
 	}
-	CHECK_MALLOC_NULL(children_pids = malloc(sizeof(pid_t)));
+	CHECK_CALL(children_pids = malloc(sizeof(pid_t)), NULL);
 
 	// Open exec file
 	exec_file = argv[1];
-	fp = fopen(exec_file, "r");
-	if (!fp) {
-		printf("Can't open file!\n");
-		exit(1);
-	}
+	CHECK_CALL(fp = fopen(exec_file, "r"), NULL);
 
 	// Read exec file
 	while (fscanf(fp, "%s", temp_string) == 1) { // Scan program (reader / writer)
@@ -102,6 +99,7 @@ int main(int argc, char *argv[]) {
 			// Child -> reader
 			if (children_pids[index] == 0) {
 				signal(SIGUSR1, handle_sigusr1);
+				printf("Hey\n");
 				while(!fl_s)
 					pause(); // Wait for a signal to continue
 
@@ -143,26 +141,30 @@ int main(int argc, char *argv[]) {
 		}
 		index++;
 	}
-	fclose(fp); // Close exec file
+	CHECK_CALL(fclose(fp), EOF); // Close exec file
 
 	// Send signal to children to continue
 	for (int i = 0; i < index; i++) {
+//		printf("Child %d ", children_pids[i]);
 		kill(children_pids[i], SIGUSR1);
 	}
+	kill(children_pids[index - 1], SIGUSR1);
 
 	// Wait for readers and writers to finish
-	for (int i = 0; i < count_readers + count_writers; i++) {
+	for (int i = 0; i < index; i++) {
 		wait(&status);
 	}
 
-//	sem_destroy(sp); // Destroy semaphore
+	// Print statistics
+	printf("\nSTATISTICS:\nTotal readers: %d\nTotal writers: %d\n", sh_mem->total_readers, sh_mem->total_writers);
+
+	// Destroy semaphores
+	sem_destroy(&(sh_mem->sem_new_reader));
+	sem_destroy(&(sh_mem->sem_new_writer));
 
 	// Destroy shared memory segment
-	err = shmctl(shmid, IPC_RMID, 0);
-	if (err == -1)
-		perror("Can't remove shared memory segment!\n");
-	else
-		printf("Removed shared memory segment %d\n", err);
+	CHECK_CALL(err = shmctl(shmid, IPC_RMID, 0), -1);
+	printf("Removed shared memory segment %d\n", err);
 
 	// Free memory
 	for (int i = 0; i < NUM_ARGS_READER - 1; i++) {

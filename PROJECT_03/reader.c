@@ -6,11 +6,11 @@ void main (int argc, char *argv[]) {
 		perror("Wrong number of arguments!\n");
 		exit(1);
 	}
-
-	int i, recid, recid_min, recid_max, shmid;
+	printf("Reader says hi!\n");
+	int i, recid, recid_min, recid_max, shmid, rp;
 	float time;
 	bool flag_many_records = false;
-	char *filename, temp_string[20];
+	char *filename, temp_string[NAME_SIZE];
 
 	// Get arguments from command line
 	for (i = 1; i < argc; i += 2) {
@@ -74,18 +74,31 @@ void main (int argc, char *argv[]) {
 	shared_mem_seg *sh_mem;
 	int retval, id, err;
 
-	sh_mem = shmat(shmid, (void *) 0, 0);
-	if (sh_mem == (void *) -1) {
-		perror("Can't attach shared memory segment!\n");
-		exit(1);
-	}
+	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), (void *) -1);
 
-	//	printf("recid min: %d \nrecid max: %d \ntime: %f \nshm id: %d\n", recid_min, recid_max, time, shmid);
+	// Enter CS (First CS for int total_readers)
+	sem_wait(&(sh_mem->sem_new_reader));
+	sh_mem->total_readers++;
+	sem_post(&(sh_mem->sem_new_reader));
+	// Exit CS
+
+	CHECK_CALL(rp = open(filename, O_RDONLY), -1); // Open file
+
+	// Set pointer to the right record
+	lseek(rp, recid * sizeof(Record), SEEK_SET);
+
+
+	// Enter CS (Second CS to read data from the file)
+
+	// Exit CS
+
+	int pid = getpid();
+	printf("Reader %d\n", pid);
+
+	CHECK_CALL(close(rp), -1); // Close file
 
 	// Detach shared memory segment
-	err = shmdt((void *) sh_mem);
-	if (err == -1)
-		perror ("Reader detaches shared memory segment.\n");
+	CHECK_CALL(err = shmdt((void *) sh_mem), -1);
 
 	exit(0);
 }

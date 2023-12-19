@@ -6,11 +6,12 @@ void main (int argc, char *argv[]) {
 		perror("Wrong number of arguments!\n");
 		exit(1);
 	}
+	printf("Writer says hello!\n");
 
-	int i, recid, shmid, value;
+	int i, recid, shmid, value, rp;
 	float time;
 	bool flag_many_records = false;
-	char *filename, temp_string[20];
+	char *filename;
 
 	// Get arguments from command line
 	for (i = 1; i < argc; i += 2) {
@@ -51,13 +52,31 @@ void main (int argc, char *argv[]) {
 		exit(1);
 	}
 
-	//	printf("recid: %d \nvalue: %d \ntime: %f \nshm id: %d\n", recid, value, time, shmid);
+	// Enter CS (First CS for int total_writers)
+	sem_wait(&(sh_mem->sem_new_writer));
+	sh_mem->total_writers++;
+	sem_post(&(sh_mem->sem_new_writer));
+	// Exit CS
+
+	CHECK_CALL(rp = open(filename, O_RDONLY), -1); // Open file
+
+	// Set pointer to the right record (reach the balance int)
+	lseek(rp, (recid * sizeof(Record) + sizeof(int) + 2 * NAME_SIZE * sizeof(char)), SEEK_SET);
+	
+
+	// Enter CS (Second CS to change data in the file)
+
+	//CHECK_CALL(write(rp, &value, sizeof(int)), -1);
+
+	// Exit CS
+
+	int pid = getpid();
+	printf("Writer %d\n", pid);
+
+	CHECK_CALL(close(rp), -1); // Close file
 
 	// Detach shared memory segment
-	err = shmdt((void *) sh_mem);
-	if (err == -1) {
-		perror ("Writer detaches shared memory segment.\n");
-	}
+	CHECK_CALL(err = shmdt((void *) sh_mem), -1);
 
 	exit(0);
 }
