@@ -1,22 +1,22 @@
 all: myprog reader writer
 
 myprog: myprog.o
-	gcc -o myprog myprog.o -lrt
+	gcc -pthread -o myprog myprog.o
 	
 myprog.o: myprog.c
-	gcc -c -o myprog.o myprog.c
+	gcc -pthread -c -o myprog.o myprog.c
 
 reader: reader.o
-	gcc -o reader reader.o -lrt
+	gcc -pthread -o reader reader.o
 
 reader.o: reader.c
-	gcc -c -o reader.o reader.c
+	gcc -pthread -c -o reader.o reader.c
 
 writer: writer.o
-	gcc -o writer writer.o -lrt
+	gcc -pthread -o writer writer.o
 	
 writer.o: writer.c
-	gcc -c -o writer.o writer.c
+	gcc -pthread -c -o writer.o writer.c
 	
 #######################################################
 
