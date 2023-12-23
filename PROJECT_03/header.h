@@ -10,9 +10,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <semaphore.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <sys/wait.h>
+//#include <sys/ipc.h>
+//#include <sys/shm.h>
+//#include <sys/wait.h>
 
 #define NAME_SIZE 20
 #define ARRAY_SIZE 50
@@ -25,13 +25,20 @@ typedef struct {
 } Record;
 
 typedef struct {
+	pid_t readers_pid[ARRAY_SIZE];
+	pid_t writers_pid[ARRAY_SIZE];
 	int total_readers;
 	int total_writers;
 	int total_recs_processed;
-	pid_t readers_pid[ARRAY_SIZE];
-	pid_t writers_pid[ARRAY_SIZE];
+	int readers_recs[ARRAY_SIZE][2];
+	int writers_recs[ARRAY_SIZE];
+	sem_t mutex;
 	sem_t sem_new_reader;
 	sem_t sem_new_writer;
+	sem_t sem_readers_recs[ARRAY_SIZE];
+	sem_t sem_writers_recs[ARRAY_SIZE];
+	sem_t sem_finished_reader;
+	sem_t sem_finished_writer;
 } shared_mem_seg;
 
 #define CHECK_CALL(call, error_value)                                                   \
@@ -43,3 +50,9 @@ typedef struct {
 			exit(EXIT_FAILURE);                                                         \
 		}                                                                               \
 	} while (0);
+
+#define CHECK_SEM(retval)  \
+	if (retval != 0) {  \
+		perror("Couldn't initialize the semaphore!\n"); \
+		exit(1); \
+	}

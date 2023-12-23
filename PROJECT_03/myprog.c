@@ -4,14 +4,6 @@
 #define NUM_ARGS_WRITER 12
 # define SEGMENTPERM 0666
 
-volatile sig_atomic_t fl_s = 0;
-
-// Handler for SIGUSR1
-void handle_sigusr1(int signum) {
-	signal(SIGUSR1, handle_sigusr1);
-	fl_s = 1;
-}
-
 int main(int argc, char *argv[]) {
 
 	if (argc != 2) {
@@ -19,18 +11,15 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int count_readers = 0, count_writers = 0, index = 0, status;
+	int count_readers = 0, count_writers = 0, index = 0, status, retval, shmid, err;
 	char *exec_file, *reader_args[NUM_ARGS_READER], *writer_args[NUM_ARGS_WRITER], temp_string[NAME_SIZE];
 	pid_t *children_pids;
 	FILE *fp;
+	shared_mem_seg *sh_mem;
 
 	// Create shared memory segment
-	sem_t *sp;
-	shared_mem_seg *sh_mem;
-	int retval, shmid, err;
-
 	CHECK_CALL(shmid = shmget(IPC_PRIVATE, sizeof(shared_mem_seg), SEGMENTPERM), -1);
-	printf("Allocated %d\n", shmid);
+	printf("Allocated memory segment: %d\n\n", shmid);
 
 	// Attach the segment
 	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), (void *) -1);
@@ -44,19 +33,20 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i < ARRAY_SIZE; i++) {
 		sh_mem->readers_pid[i] = 0;
 		sh_mem->writers_pid[i] = 0;
+		sh_mem->readers_recs[i][0] = 0;
+		sh_mem->writers_recs[i] = 0;
 	}
 
 	// Initialize the semaphores
-	retval = sem_init(&(sh_mem->sem_new_reader), 1, 1);
-	if (retval != 0) {
-		perror("Couldn't initialize the semaphore!\n");
-		exit(1);
-	}
+	CHECK_SEM(sem_init(&(sh_mem->mutex), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->sem_new_reader), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->sem_new_writer), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->sem_finished_reader), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->sem_finished_writer), 1, 1));
 
-	retval = sem_init(&(sh_mem->sem_new_writer), 1, 1);
-	if (retval != 0) {
-		perror("Couldn't initialize the semaphore!\n");
-		exit(1);
+	for (int i = 0; i < ARRAY_SIZE; i++) {
+		CHECK_SEM(sem_init(&(sh_mem->sem_readers_recs[i]), 1, 1));
+		CHECK_SEM(sem_init(&(sh_mem->sem_writers_recs[i]), 1, 1));
 	}
 
 	// Allocate memory
@@ -98,11 +88,6 @@ int main(int argc, char *argv[]) {
 
 			// Child -> reader
 			if (children_pids[index] == 0) {
-				signal(SIGUSR1, handle_sigusr1);
-				printf("Hey\n");
-				while(!fl_s)
-					pause(); // Wait for a signal to continue
-
 				execvp("./reader", reader_args);
 				perror("exec failure!\n");
 				exit(1);
@@ -130,10 +115,6 @@ int main(int argc, char *argv[]) {
 
 			// Child -> writer
 			if (children_pids[index] == 0) {
-				signal(SIGUSR1, handle_sigusr1);
-				while(!fl_s)
-					pause(); // Wait for a signal to continue
-
 				execvp("./writer", writer_args);
 				perror("exec failure!\n");
 				exit(1);
@@ -142,13 +123,6 @@ int main(int argc, char *argv[]) {
 		index++;
 	}
 	CHECK_CALL(fclose(fp), EOF); // Close exec file
-
-	// Send signal to children to continue
-	for (int i = 0; i < index; i++) {
-//		printf("Child %d ", children_pids[i]);
-		kill(children_pids[i], SIGUSR1);
-	}
-	kill(children_pids[index - 1], SIGUSR1);
 
 	// Wait for readers and writers to finish
 	for (int i = 0; i < index; i++) {
@@ -164,7 +138,7 @@ int main(int argc, char *argv[]) {
 
 	// Destroy shared memory segment
 	CHECK_CALL(err = shmctl(shmid, IPC_RMID, 0), -1);
-	printf("Removed shared memory segment %d\n", err);
+	printf("Removed shared memory segment %d\n\n", err);
 
 	// Free memory
 	for (int i = 0; i < NUM_ARGS_READER - 1; i++) {

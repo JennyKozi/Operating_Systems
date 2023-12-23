@@ -6,14 +6,17 @@ void main (int argc, char *argv[]) {
 		perror("Wrong number of arguments!\n");
 		exit(1);
 	}
-	printf("Reader says hi!\n");
-	int i, recid, recid_min, recid_max, shmid, rp;
+
+	int recid, recid_min, recid_max, shmid, rp, retval, err, index;
 	float time;
-	bool flag_many_records = false;
 	char *filename, temp_string[NAME_SIZE];
+	bool flag_many_records = false;
+	shared_mem_seg *sh_mem;
+
+	int pid = getpid();
 
 	// Get arguments from command line
-	for (i = 1; i < argc; i += 2) {
+	for (int i = 1; i < argc; i += 2) {
 		
 		// Datafile
 		if (strcmp("-f", argv[i]) == 0) {
@@ -71,31 +74,54 @@ void main (int argc, char *argv[]) {
 	}
 
 	// Attach shared memory segment
-	shared_mem_seg *sh_mem;
-	int retval, id, err;
-
 	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), (void *) -1);
 
-	// Enter CS (First CS for int total_readers)
-	sem_wait(&(sh_mem->sem_new_reader));
-	sh_mem->total_readers++;
-	sem_post(&(sh_mem->sem_new_reader));
-	// Exit CS
-
-	CHECK_CALL(rp = open(filename, O_RDONLY), -1); // Open file
+	// Open file
+	CHECK_CALL(rp = open(filename, O_RDONLY), -1);
 
 	// Set pointer to the right record
 	lseek(rp, recid * sizeof(Record), SEEK_SET);
 
+	// Enter CS (new reader)
+	sem_wait(&(sh_mem->sem_new_reader));
+	for (int i = 0; i < ARRAY_SIZE; i++) {
+		if (sh_mem->readers_pid[i] == 0) {
+			sh_mem->readers_pid[i] = pid; // Add readers's pid to the array of reader's pids
+			break;
+		}
+	}
+	sem_post(&(sh_mem->sem_new_reader));
+	// Exit CS (new reader)
 
-	// Enter CS (Second CS to read data from the file)
+	// Enter CS (insert rec id in the array)
+	sem_wait(&(sh_mem->mutex));
+	for (int i = 0; i < ARRAY_SIZE; i++) {
+		
+	}
+	sem_post(&(sh_mem->mutex));
+	// Exit CS (insert rec id in the array)
 
-	// Exit CS
+	
 
-	int pid = getpid();
+	// Search for rec in the arrays (if a process reads it or writes on it)
+	
+
+	// Enter CS (read)
+	sem_wait(&(sh_mem->sem_readers_recs[index]));
+
+	sem_post(&(sh_mem->sem_readers_recs[index]));
+	// Exit CS (read)
+
+	// Enter CS (finished reader)
+	sem_wait(&(sh_mem->sem_finished_reader));
+	sh_mem->total_readers++; // Increase number of readers
+	sem_post(&(sh_mem->sem_finished_reader));
+	// Exit CS (finished reader)
+
 	printf("Reader %d\n", pid);
 
-	CHECK_CALL(close(rp), -1); // Close file
+	// Close file
+	CHECK_CALL(close(rp), -1);
 
 	// Detach shared memory segment
 	CHECK_CALL(err = shmdt((void *) sh_mem), -1);
