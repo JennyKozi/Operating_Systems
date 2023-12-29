@@ -30,9 +30,12 @@ typedef struct {
 	int total_readers;
 	int total_writers;
 	int total_recs_processed;
+	int count_processes;
 	int readers_recs[ARRAY_SIZE][2];
 	int writers_recs[ARRAY_SIZE];
-	sem_t mutex;
+	int time_array[ARRAY_SIZE];
+	sem_t mutex_recid;
+	sem_t mutex_sum;
 	sem_t sem_new_reader;
 	sem_t sem_new_writer;
 	sem_t sem_readers_recs[ARRAY_SIZE];

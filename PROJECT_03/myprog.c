@@ -25,20 +25,24 @@ int main(int argc, char *argv[]) {
 	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), (void *) -1);
 
 	// Initialize data of shared memory segment
-	(*sh_mem).total_readers = 0;
-	(*sh_mem).total_writers = 0;
-	(*sh_mem).total_recs_processed = 0;
+	sh_mem->total_readers = 0;
+	sh_mem->total_writers = 0;
+	sh_mem->total_recs_processed = 0;
+	sh_mem->count_processes = 0;
 
 	// Initialize the arrays
 	for (int i = 0; i < ARRAY_SIZE; i++) {
 		sh_mem->readers_pid[i] = 0;
 		sh_mem->writers_pid[i] = 0;
 		sh_mem->readers_recs[i][0] = 0;
+		sh_mem->readers_recs[i][1] = 0;
 		sh_mem->writers_recs[i] = 0;
+		sh_mem->time_array[i] = 0;
 	}
 
 	// Initialize the semaphores
-	CHECK_SEM(sem_init(&(sh_mem->mutex), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->mutex_recid), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->mutex_sum), 1, 1));
 	CHECK_SEM(sem_init(&(sh_mem->sem_new_reader), 1, 1));
 	CHECK_SEM(sem_init(&(sh_mem->sem_new_writer), 1, 1));
 	CHECK_SEM(sem_init(&(sh_mem->sem_finished_reader), 1, 1));

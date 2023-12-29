@@ -7,11 +7,12 @@ void main (int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int recid, recid_min, recid_max, shmid, rp, retval, err, index;
+	int recid, recid_min, recid_max, shmid, rp, retval, err, rec_index, pid_index, num_recs = 1;
 	float time;
 	char *filename, temp_string[NAME_SIZE];
 	bool flag_many_records = false;
 	shared_mem_seg *sh_mem;
+	Record rec;
 
 	int pid = getpid();
 
@@ -55,6 +56,7 @@ void main (int argc, char *argv[]) {
 				}
 				max_s[count] = '\0';
 				recid_max = atoi(max_s);
+				num_recs = recid_max - recid_min + 1;
 			}
 			// One record
 			else {
@@ -64,7 +66,7 @@ void main (int argc, char *argv[]) {
 
 		// Time
 		else if (strcmp("-d", argv[i]) == 0) {
-			time = atof(argv[i + 1]);
+			time = atoi(argv[i + 1]);
 		}
 
 		// Shared Memory Segment
@@ -87,6 +89,7 @@ void main (int argc, char *argv[]) {
 	for (int i = 0; i < ARRAY_SIZE; i++) {
 		if (sh_mem->readers_pid[i] == 0) {
 			sh_mem->readers_pid[i] = pid; // Add readers's pid to the array of reader's pids
+			pid_index = i;
 			break;
 		}
 	}
@@ -94,23 +97,49 @@ void main (int argc, char *argv[]) {
 	// Exit CS (new reader)
 
 	// Enter CS (insert rec id in the array)
-	sem_wait(&(sh_mem->mutex));
-	for (int i = 0; i < ARRAY_SIZE; i++) {
-		
-	}
-	sem_post(&(sh_mem->mutex));
+	sem_wait(&(sh_mem->mutex_recid));
+	rec_index = sh_mem->count_processes;
+	sh_mem->count_processes++;
+	sem_post(&(sh_mem->mutex_recid));
 	// Exit CS (insert rec id in the array)
 
-	
-
-	// Search for rec in the arrays (if a process reads it or writes on it)
-	
+	// Search for rec in the arrays to see if a process writes on it
 
 	// Enter CS (read)
-	sem_wait(&(sh_mem->sem_readers_recs[index]));
+	sem_wait(&(sh_mem->mutex_recid));
 
-	sem_post(&(sh_mem->sem_readers_recs[index]));
+	// There is one or more writers who write on this record
+	for (int i = 0; i < sh_mem->count_processes; i++) {
+		if (sh_mem->sem_writers_recs[i] == recid) {
+			sem_post(&(sh_mem->mutex_recid)); // Leave mutex, don't hold back the other processes
+			sem_wait(&(sh_mem->sem_writers_recs[i])); // Reader is suspended until writers (who came before) finish
+			sem_wait(&(sh_mem->mutex_recid));
+		}
+	}
+	sem_post(&(sh_mem->mutex_recid));
+
+	// Add the record id in the array with the other ids of records that the readers want ??????????
+	sh_mem->readers_recs[rec_index][0] = recid;
+
+	// READ
+	sem_wait(&(sh_mem->sem_readers_recs[rec_index]));
+	read(rp, &rec, sizeof(Record));
+	sem_post(&(sh_mem->sem_readers_recs[rec_index]));
+	// FINISHED READING
+
+	// Remove id of this rec from the array
+	sh_mem->readers_recs[rec_index][0] = 0; 
+	
 	// Exit CS (read)
+
+	// Close file
+	CHECK_CALL(close(rp), -1);
+
+	// Enter CS (increase records processed)
+	sem_wait(&(sh_mem->mutex_sum));
+	sh_mem->total_recs_processed += num_recs; // Increase number of records that have been processed
+	sem_wait(&(sh_mem->mutex_sum));
+	// Exit CS (increase records processed)
 
 	// Enter CS (finished reader)
 	sem_wait(&(sh_mem->sem_finished_reader));
@@ -118,10 +147,11 @@ void main (int argc, char *argv[]) {
 	sem_post(&(sh_mem->sem_finished_reader));
 	// Exit CS (finished reader)
 
-	printf("Reader %d\n", pid);
+	// Remove readers's pid from the array of readers' pids
+	sh_mem->readers_pid[pid_index] = 0;
 
-	// Close file
-	CHECK_CALL(close(rp), -1);
+
+	printf("Reader %d\n", pid);
 
 	// Detach shared memory segment
 	CHECK_CALL(err = shmdt((void *) sh_mem), -1);

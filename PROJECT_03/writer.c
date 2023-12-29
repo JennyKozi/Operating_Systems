@@ -7,7 +7,7 @@ void main (int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int recid, shmid, value, rp, retval, err, index;
+	int recid, shmid, value, rp, retval, err, rec_index, pid_index, num_recs = 1;
 	float time;
 	char *filename;
 	shared_mem_seg *sh_mem;
@@ -34,7 +34,7 @@ void main (int argc, char *argv[]) {
 
 		// Time
 		else if (strcmp("-d", argv[i]) == 0) {
-			time = atof(argv[i + 1]);
+			time = atoi(argv[i + 1]);
 		}
 
 		// Shared Memory Segment
@@ -57,31 +57,48 @@ void main (int argc, char *argv[]) {
 	for (int i = 0; i < ARRAY_SIZE; i++) {
 		if (sh_mem->writers_pid[i] == 0) {
 			sh_mem->writers_pid[i] = pid; // Add writer's pid to the array of reader's pids
+			pid_index = i;
 			break;
 		}
 	}
 	sem_post(&(sh_mem->sem_new_writer));
 	// Exit CS (new writer)
 
-	
+	// Enter CS (insert rec id in the array)
+	sem_wait(&(sh_mem->mutex_recid));
+	rec_index = sh_mem->count_processes;
+	sh_mem->count_processes++;
+	sem_post(&(sh_mem->mutex_recid));
+	// Exit CS (insert rec id in the array)
 
 	// Search for the rec in the arrays (if a process reads it or writes on it)
 
 
 	// Enter CS (write)
-	sem_wait(&(sh_mem->sem_readers_recs[index]));
+	sem_wait(&(sh_mem->sem_writers_recs[rec_index]));
 	CHECK_CALL(write(rp, &value, sizeof(int)), -1);
-	sem_post(&(sh_mem->sem_readers_recs[index]));
+	sem_post(&(sh_mem->sem_writers_recs[rec_index]));
 	// Exit CS (write)
+
+	// Close file
+	CHECK_CALL(close(rp), -1);
+
+	// Enter CS (increase records processed)
+	sem_wait(&(sh_mem->mutex_sum));
+	sh_mem->total_recs_processed += num_recs; // Increase number of records that have been processed
+	sem_wait(&(sh_mem->mutex_sum));
+	// Exit CS (increase records processed)
 
 	// Enter CS (finished writer)
 	sem_wait(&(sh_mem->sem_finished_writer));
 	sh_mem->total_writers++; // Increase number of writers
 	sem_post(&(sh_mem->sem_finished_writer));
 	// Exit CS (finished writer)
-	
-	// Close file
-	CHECK_CALL(close(rp), -1);
+
+	// Remove writer's pid to the array of writers' pids
+	sh_mem->writers_pid[pid_index] = 0;
+
+	printf("Writer %d\n", pid);
 
 	// Detach shared memory segment
 	CHECK_CALL(err = shmdt((void *) sh_mem), -1);
