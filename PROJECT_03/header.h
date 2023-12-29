@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <semaphore.h>
+//#include <sys/times.h>
 //#include <sys/ipc.h>
 //#include <sys/shm.h>
 //#include <sys/wait.h>
@@ -33,15 +34,14 @@ typedef struct {
 	int count_processes;
 	int readers_recs[ARRAY_SIZE][2];
 	int writers_recs[ARRAY_SIZE];
-	int time_array[ARRAY_SIZE];
-	sem_t mutex_recid;
-	sem_t mutex_sum;
+	double time_readers[ARRAY_SIZE];
+	double time_writers[ARRAY_SIZE];
+	sem_t mutex;
+	sem_t sem_sum;
 	sem_t sem_new_reader;
 	sem_t sem_new_writer;
 	sem_t sem_readers_recs[ARRAY_SIZE];
 	sem_t sem_writers_recs[ARRAY_SIZE];
-	sem_t sem_finished_reader;
-	sem_t sem_finished_writer;
 } shared_mem_seg;
 
 #define CHECK_CALL(call, error_value)                                                   \

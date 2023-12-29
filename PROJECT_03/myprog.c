@@ -11,9 +11,9 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int count_readers = 0, count_writers = 0, index = 0, status, retval, shmid, err;
+	int count = 0, status, retval, shmid, err;
 	char *exec_file, *reader_args[NUM_ARGS_READER], *writer_args[NUM_ARGS_WRITER], temp_string[NAME_SIZE];
-	pid_t *children_pids;
+	pid_t child;
 	FILE *fp;
 	shared_mem_seg *sh_mem;
 
@@ -37,17 +37,15 @@ int main(int argc, char *argv[]) {
 		sh_mem->readers_recs[i][0] = 0;
 		sh_mem->readers_recs[i][1] = 0;
 		sh_mem->writers_recs[i] = 0;
-		sh_mem->time_array[i] = 0;
+		sh_mem->time_readers[i] = 0;
+		sh_mem->time_writers[i] = 0;
 	}
 
 	// Initialize the semaphores
-	CHECK_SEM(sem_init(&(sh_mem->mutex_recid), 1, 1));
-	CHECK_SEM(sem_init(&(sh_mem->mutex_sum), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->mutex), 1, 1));
+	CHECK_SEM(sem_init(&(sh_mem->sem_sum), 1, 1));
 	CHECK_SEM(sem_init(&(sh_mem->sem_new_reader), 1, 1));
 	CHECK_SEM(sem_init(&(sh_mem->sem_new_writer), 1, 1));
-	CHECK_SEM(sem_init(&(sh_mem->sem_finished_reader), 1, 1));
-	CHECK_SEM(sem_init(&(sh_mem->sem_finished_writer), 1, 1));
-
 	for (int i = 0; i < ARRAY_SIZE; i++) {
 		CHECK_SEM(sem_init(&(sh_mem->sem_readers_recs[i]), 1, 1));
 		CHECK_SEM(sem_init(&(sh_mem->sem_writers_recs[i]), 1, 1));
@@ -60,7 +58,6 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i < NUM_ARGS_WRITER - 1; i++) {
 		CHECK_CALL(writer_args[i] = malloc(NAME_SIZE * sizeof(char)), NULL);
 	}
-	CHECK_CALL(children_pids = malloc(sizeof(pid_t)), NULL);
 
 	// Open exec file
 	exec_file = argv[1];
@@ -69,12 +66,9 @@ int main(int argc, char *argv[]) {
 	// Read exec file
 	while (fscanf(fp, "%s", temp_string) == 1) { // Scan program (reader / writer)
 
-		children_pids = realloc(children_pids, (index + 1) * sizeof(pid_t));
-
 		// Exec line to run a reader program
 		if (strcmp("./reader", temp_string) == 0) {
 
-			count_readers++;
 			strcpy(reader_args[0], temp_string);
 			for (int i = 1; i <= 6; i++) { // 1) "-f" 2) datafile 3) "-l" 4) recid 5) "-d" 6) time
 				fscanf(fp, "%s", reader_args[i]);
@@ -84,14 +78,14 @@ int main(int argc, char *argv[]) {
 			reader_args[9] = NULL;
 
 			// Create a new process that will become a reader
-			children_pids[index] = fork();
-			if (children_pids[index] == -1) {
+			child = fork();
+			if (child == -1) {
 				perror("Failed to fork!\n");
 				exit(1);
 			}
 
 			// Child -> reader
-			if (children_pids[index] == 0) {
+			if (child == 0) {
 				execvp("./reader", reader_args);
 				perror("exec failure!\n");
 				exit(1);
@@ -100,7 +94,6 @@ int main(int argc, char *argv[]) {
 
 		// Exec line to run a writer program
 		else {
-			count_writers++;
 			strcpy(writer_args[0], temp_string);
 
 			for (int i = 1; i <= 8; i++) { // 1) "-f" 2) datafile 3) "-l" 4) recid 5) "-v" 6) value 7) "-d" 8) time
@@ -111,34 +104,44 @@ int main(int argc, char *argv[]) {
 			writer_args[11] = NULL;
 
 			// Create a new process that will become a writer
-			children_pids[index] = fork();
-			if (children_pids[index] == -1) {
+			child = fork();
+			if (child == -1) {
 				perror("Failed to fork!\n");
 				exit(1);
 			}
 
 			// Child -> writer
-			if (children_pids[index] == 0) {
+			if (child == 0) {
 				execvp("./writer", writer_args);
 				perror("exec failure!\n");
 				exit(1);
 			}
 		}
-		index++;
+		count++;
 	}
 	CHECK_CALL(fclose(fp), EOF); // Close exec file
 
 	// Wait for readers and writers to finish
-	for (int i = 0; i < index; i++) {
+	for (int i = 0; i < count; i++) {
 		wait(&status);
 	}
 
+	// Calculate statistics
+	float average_time_readers, average_time_writers, max_time = 0.0, sum_readers = 0.0, sum_writers = 0.0;
+
 	// Print statistics
 	printf("\nSTATISTICS:\nTotal readers: %d\nTotal writers: %d\n", sh_mem->total_readers, sh_mem->total_writers);
+	printf("\nTotal records processed: %d\n", sh_mem->count_processes);
 
 	// Destroy semaphores
 	sem_destroy(&(sh_mem->sem_new_reader));
 	sem_destroy(&(sh_mem->sem_new_writer));
+	sem_destroy(&(sh_mem->sem_sum));
+	sem_destroy(&(sh_mem->mutex));
+	for (int i = 0; i < ARRAY_SIZE; i++) {
+		sem_destroy(&(sh_mem->sem_readers_recs[i]));
+		sem_destroy(&(sh_mem->sem_writers_recs[i]));
+	}
 
 	// Destroy shared memory segment
 	CHECK_CALL(err = shmctl(shmid, IPC_RMID, 0), -1);
@@ -151,7 +154,6 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i < NUM_ARGS_WRITER - 1; i++) {
 		free(writer_args[i]);
 	}
-	free(children_pids);
 	
     return 0;
 }

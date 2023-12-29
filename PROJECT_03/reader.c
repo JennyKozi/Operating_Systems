@@ -7,13 +7,17 @@ void main (int argc, char *argv[]) {
 		exit(1);
 	}
 
-	int recid, recid_min, recid_max, shmid, rp, retval, err, rec_index, pid_index, num_recs = 1;
-	float time;
+	// Variables to count time
+	double t1, t2, realtime, tics_per_sec;
+	struct tms tb1, tb2;
+	tics_per_sec = (double)sysconf(_SC_CLK_TCK);
+	t1 = (double)times(&tb1);
+
+	int recid, recid_min, recid_max, shmid, rp, retval, err, rec_index, pid_index, num_recs = 1, last_writer, time;
 	char *filename, temp_string[NAME_SIZE];
 	bool flag_many_records = false;
 	shared_mem_seg *sh_mem;
 	Record rec;
-
 	int pid = getpid();
 
 	// Get arguments from command line
@@ -97,61 +101,62 @@ void main (int argc, char *argv[]) {
 	// Exit CS (new reader)
 
 	// Enter CS (insert rec id in the array)
-	sem_wait(&(sh_mem->mutex_recid));
-	rec_index = sh_mem->count_processes;
+	sem_wait(&(sh_mem->mutex));
+	rec_index = sh_mem->total_readers; // Very important: variable rec_index indicates the index for the array of records for the readers
+	last_writer = sh_mem->total_writers; // The last writer that arrived before this process
 	sh_mem->count_processes++;
-	sem_post(&(sh_mem->mutex_recid));
+	sh_mem->total_readers++; // Increase number of readers
+	sh_mem->readers_recs[rec_index][0] = recid; // Insert the record id of this reader in the array
+	sem_post(&(sh_mem->mutex));
 	// Exit CS (insert rec id in the array)
 
-	// Search for rec in the arrays to see if a process writes on it
-
-	// Enter CS (read)
-	sem_wait(&(sh_mem->mutex_recid));
+	// Enter CS (Read)
+	sem_wait(&(sh_mem->sem_readers_recs[rec_index]));
+	// Enter CS (Search records)
+	sem_wait(&(sh_mem->mutex));
 
 	// There is one or more writers who write on this record
-	for (int i = 0; i < sh_mem->count_processes; i++) {
+	for (int i = 0; i < last_writer; i++) {
 		if (sh_mem->sem_writers_recs[i] == recid) {
-			sem_post(&(sh_mem->mutex_recid)); // Leave mutex, don't hold back the other processes
+			sem_post(&(sh_mem->mutex)); // Leave mutex, don't hold back the other processes
 			sem_wait(&(sh_mem->sem_writers_recs[i])); // Reader is suspended until writers (who came before) finish
-			sem_wait(&(sh_mem->mutex_recid));
+			sem_wait(&(sh_mem->mutex));
 		}
 	}
-	sem_post(&(sh_mem->mutex_recid));
+	sem_post(&(sh_mem->mutex));
+	// Exit CS (Search records)
 
-	// Add the record id in the array with the other ids of records that the readers want ??????????
-	sh_mem->readers_recs[rec_index][0] = recid;
-
-	// READ
-	sem_wait(&(sh_mem->sem_readers_recs[rec_index]));
 	read(rp, &rec, sizeof(Record));
 	sem_post(&(sh_mem->sem_readers_recs[rec_index]));
-	// FINISHED READING
+	// Exit CS (Read)
 
-	// Remove id of this rec from the array
-	sh_mem->readers_recs[rec_index][0] = 0; 
-	
-	// Exit CS (read)
+	// Enter CS (Remove id of this rec from the array)
+	sem_wait(&(sh_mem->mutex));
+	sh_mem->readers_recs[rec_index][0] = 0;
+	sem_post(&(sh_mem->mutex));
+	// Exit CS (Remove id of this rec from the array)
 
 	// Close file
 	CHECK_CALL(close(rp), -1);
 
 	// Enter CS (increase records processed)
-	sem_wait(&(sh_mem->mutex_sum));
+	sem_wait(&(sh_mem->sem_sum));
 	sh_mem->total_recs_processed += num_recs; // Increase number of records that have been processed
-	sem_wait(&(sh_mem->mutex_sum));
+	sem_wait(&(sh_mem->sem_sum));
 	// Exit CS (increase records processed)
 
-	// Enter CS (finished reader)
-	sem_wait(&(sh_mem->sem_finished_reader));
-	sh_mem->total_readers++; // Increase number of readers
-	sem_post(&(sh_mem->sem_finished_reader));
-	// Exit CS (finished reader)
-
-	// Remove readers's pid from the array of readers' pids
+	// Enter CS (Remove readers's pid from the array of readers' pids)
+	sem_wait(&(sh_mem->sem_new_reader));
 	sh_mem->readers_pid[pid_index] = 0;
-
+	sem_post(&(sh_mem->sem_new_reader));
+	// Exit CS (Remove readers's pid from the array of readers' pids)
 
 	printf("Reader %d\n", pid);
+
+	// Calculate time
+	t2 = (double)times(&tb2);
+	realtime = (double)((t2 - t1) / tics_per_sec);
+	sh_mem->time_readers[rec_index] = realtime;
 
 	// Detach shared memory segment
 	CHECK_CALL(err = shmdt((void *) sh_mem), -1);
