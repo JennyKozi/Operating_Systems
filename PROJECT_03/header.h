@@ -6,14 +6,15 @@
 #include <errno.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <semaphore.h>
-//#include <sys/times.h>
-//#include <sys/ipc.h>
-//#include <sys/shm.h>
-//#include <sys/wait.h>
+#include <sys/times.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
 
 #define NAME_SIZE 20
 #define ARRAY_SIZE 50

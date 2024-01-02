@@ -21,10 +21,10 @@ writer.o: writer.c
 #######################################################
 
 run: myprog
-	./myprog exec50.txt
+	./myprog exec2.txt
 
 valgrind: myprog
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./myprog exec50.txt
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./myprog exec2.txt
 
 clean:
 	rm -rf myprog myprog.o reader reader.o writer writer.o

@@ -13,9 +13,10 @@ void main (int argc, char *argv[]) {
 	tics_per_sec = (double)sysconf(_SC_CLK_TCK);
 	t1 = (double)times(&tb1);
 
-	int recid, shmid, value, rp, retval, err, rec_index, pid_index, num_recs = 1, last_reader, time;
+	int recid, shmid, value, new_balance, prev_balance, rp, retval, err, proc_index, num_recs = 1, last_reader, max_time;
 	char *filename;
 	shared_mem_seg *sh_mem;
+	Record rec;
 	int pid = getpid();
 
 	// Get arguments from command line
@@ -38,7 +39,7 @@ void main (int argc, char *argv[]) {
 
 		// Time
 		else if (strcmp("-d", argv[i]) == 0) {
-			time = atoi(argv[i + 1]);
+			max_time = atoi(argv[i + 1]);
 		}
 
 		// Shared Memory Segment
@@ -48,67 +49,91 @@ void main (int argc, char *argv[]) {
 	}
 
 	// Attach shared memory segment
-	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), -1);
+	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), (void *) -1);
 
 	// Open file
-	CHECK_CALL(rp = open(filename, O_RDONLY), -1); 
+	CHECK_CALL(rp = open(filename, O_RDWR), -1);
 
 	// Set pointer to the right record (reach the int balance)
-	lseek(rp, (recid * sizeof(Record) + sizeof(int) + 2 * NAME_SIZE * sizeof(char)), SEEK_SET);
-
-	// Enter CS (New writer)
-	sem_wait(&(sh_mem->sem_new_writer));
-	for (int i = 0; i < ARRAY_SIZE; i++) {
-		if (sh_mem->writers_pid[i] == 0) {
-			sh_mem->writers_pid[i] = pid; // Add writer's pid to the array of reader's pids
-			pid_index = i;
-			break;
-		}
-	}
-	sem_post(&(sh_mem->sem_new_writer));
-	// Exit CS (New writer)
+	lseek(rp, (recid - 1) * sizeof(Record), SEEK_SET);
 
 	// Enter CS (Insert rec id in the array)
 	sem_wait(&(sh_mem->mutex));
-	rec_index = sh_mem->total_writers; // Very important: variable rec_index indicates the index for the array of records for the writers
+	proc_index = sh_mem->total_writers; // Very important: variable proc_index indicates the index for the array of records for the writers
 	last_reader = sh_mem->total_readers; // The last reader that arrived before this process
 	sh_mem->count_processes++;
 	sh_mem->total_writers++; // Increase number of writers
-	sh_mem->writers_recs[rec_index] = recid; // Insert the record id of this reader in the array
-	sem_post(&(sh_mem->mutex));
-	// Exit CS (Insert rec id in the array)
+	sh_mem->writers_recs[proc_index] = recid; // Insert the record id of this writer in the array
 
 	// Enter CS (Write)
-	sem_wait(&(sh_mem->sem_writers_recs[rec_index]));
+	sem_wait(&(sh_mem->sem_writers_recs[proc_index]));
+	sem_post(&(sh_mem->mutex));
+	// Exit CS (Insert rec id in the array)
+	
+	// Enter CS (New writer)
+	sem_wait(&(sh_mem->sem_new_writer));
+	sh_mem->writers_pid[proc_index] = pid; // Add writers's pid to the array of writers' pids
+	sem_post(&(sh_mem->sem_new_writer));
+	// Exit CS (New writer)
+
 	// Enter CS (Search records)
 	sem_wait(&(sh_mem->mutex));
 
 	// There is one or more writers who write on this record
-	for (int i = 0; i < rec_index; i++) {
-		if (sh_mem->sem_writers_recs[i] == recid) {
+	for (int i = 0; i < proc_index; i++) {
+		if (sh_mem->writers_recs[i] == recid) {
+			int temp_pid = sh_mem->writers_pid[i];
 			sem_post(&(sh_mem->mutex)); // Leave mutex, don't hold back the other processes
+			printf("Writer %d: waiting for writer %d to write on record %d\n", pid, sh_mem->writers_pid[i], recid);
 			sem_wait(&(sh_mem->sem_writers_recs[i])); // Writer is suspended until writers (who came before) finish
-			sem_wait(&(sh_mem->mutex));
+			printf("Writer %d: writer %d released record %d\n", pid, temp_pid, recid);
+			sem_post(&(sh_mem->sem_writers_recs[i])); // Release resource
+			sem_wait(&(sh_mem->mutex)); // Take back mutex so that you can keep searching
 		}
 	}
 	// There is one or more readers who read on this record
 	for (int i = 0; i < last_reader; i++) {
-		if (sh_mem->sem_readers_recs[i] == recid) {
+		// Reader has one record
+		if (sh_mem->readers_recs[i][1] == 0) {
+			if (sh_mem->readers_recs[i][0] == recid) {
+				int temp_pid = sh_mem->readers_pid[i];
+				sem_post(&(sh_mem->mutex)); // Leave mutex, don't hold back the other processes
+				printf("Writer %d: waiting for reader %d to read record %d\n", pid, temp_pid, recid);
+				sem_wait(&(sh_mem->sem_readers_recs[i])); // Writer is suspended until readers (who came before) finish
+				printf("Writer %d: reader %d released record %d\n", pid, temp_pid, recid);
+				sem_post(&(sh_mem->sem_readers_recs[i])); // Release resource
+				sem_wait(&(sh_mem->mutex)); // Take back mutex so that you can keep searching
+			}
+		}
+		// Reader has many records
+		else if ((sh_mem->readers_recs[i][0] <= recid) && (sh_mem->readers_recs[i][1] >= recid)) {
+			int temp_pid = sh_mem->readers_pid[i];
 			sem_post(&(sh_mem->mutex)); // Leave mutex, don't hold back the other processes
+			printf("Writer %d: waiting for reader %d to read record %d\n", pid, temp_pid, recid);
 			sem_wait(&(sh_mem->sem_readers_recs[i])); // Writer is suspended until readers (who came before) finish
-			sem_wait(&(sh_mem->mutex));
+			printf("Writer %d: reader %d released record %d\n", pid, temp_pid, recid);
+			sem_post(&(sh_mem->sem_readers_recs[i])); // Release resource
+			sem_wait(&(sh_mem->mutex)); // Take back mutex so that you can keep searching
 		}
 	}
 	sem_post(&(sh_mem->mutex));
 	// Exit CS (Search records)
 
-	CHECK_CALL(write(rp, &value, sizeof(int)), -1);
-	sem_post(&(sh_mem->sem_writers_recs[rec_index]));
-	// Exit CS (Write)
+	read(rp, &rec, sizeof(Record)); // Read record to get the current balance
+	prev_balance = rec.balance;
+	new_balance = rec.balance + value;
+	rec.balance += value;
+	lseek(rp, (recid - 1) * sizeof(Record), SEEK_SET);
+	sleep(rand() % max_time); // Sleep for some seconds while holding the record
+	CHECK_CALL(write(rp, &rec, sizeof(Record)), -1);
+	printf("Writer %d: record id: %d, previous balance: %d, new balance: %d\n", pid, recid, prev_balance, new_balance);
 
 	// Enter CS (Remove id of this rec from the array)
 	sem_wait(&(sh_mem->mutex));
-	sh_mem->writers_recs[rec_index] = 0;
+	sh_mem->writers_recs[proc_index] = 0;
+	sem_post(&(sh_mem->sem_writers_recs[proc_index]));
+	// Exit CS (Write)
+
 	sem_post(&(sh_mem->mutex));
 	// Exit CS (Remove id of this rec from the array)
 
@@ -118,21 +143,19 @@ void main (int argc, char *argv[]) {
 	// Enter CS (Increase records processed)
 	sem_wait(&(sh_mem->sem_sum));
 	sh_mem->total_recs_processed += num_recs; // Increase number of records that have been processed
-	sem_wait(&(sh_mem->sem_sum));
+	sem_post(&(sh_mem->sem_sum));
 	// Exit CS (Increase records processed)
 
 	// Enter CS (Remove writers's pid from the array of writers' pids)
 	sem_wait(&(sh_mem->sem_new_writer));
-	sh_mem->writers_pid[pid_index] = 0;
+	sh_mem->writers_pid[proc_index] = 0;
 	sem_post(&(sh_mem->sem_new_writer));
 	// Exit CS (Remove writers's pid from the array of writers' pids)
-
-	printf("Writer %d\n", pid);
 
 	// Calculate time
 	t2 = (double)times(&tb2);
 	realtime = (double)((t2 - t1) / tics_per_sec);
-	sh_mem->time_readers[rec_index] = realtime;
+	sh_mem->time_writers[proc_index] = realtime;
 
 	// Detach shared memory segment
 	CHECK_CALL(err = shmdt((void *) sh_mem), -1);

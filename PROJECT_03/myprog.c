@@ -17,6 +17,8 @@ int main(int argc, char *argv[]) {
 	FILE *fp;
 	shared_mem_seg *sh_mem;
 
+	srand(time(NULL));
+
 	// Create shared memory segment
 	CHECK_CALL(shmid = shmget(IPC_PRIVATE, sizeof(shared_mem_seg), SEGMENTPERM), -1);
 	printf("Allocated memory segment: %d\n\n", shmid);
@@ -127,11 +129,31 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Calculate statistics
-	float average_time_readers, average_time_writers, max_time = 0.0, sum_readers = 0.0, sum_writers = 0.0;
+	double average_time_readers = 0, average_time_writers = 0, max_time = 0.0, sum_readers = 0.0, sum_writers = 0.0;
+
+	// Readers
+	for (int i = 0; i < sh_mem->total_readers; i++) {
+		sum_readers += sh_mem->time_readers[i];
+		if (max_time < sh_mem->time_readers[i])
+			max_time = sh_mem->time_readers[i];
+	}
+	average_time_readers = (double)(sum_readers / sh_mem->total_readers);
+
+	// Writers
+	for (int i = 0; i < sh_mem->total_writers; i++) {
+		sum_writers += sh_mem->time_writers[i];
+		if (max_time < sh_mem->time_writers[i])
+			max_time = sh_mem->time_writers[i];
+	}
+	average_time_writers = (double)(sum_writers / sh_mem->total_writers);
 
 	// Print statistics
-	printf("\nSTATISTICS:\nTotal readers: %d\nTotal writers: %d\n", sh_mem->total_readers, sh_mem->total_writers);
-	printf("\nTotal records processed: %d\n", sh_mem->count_processes);
+	printf("\nSTATISTICS:\nTotal readers: %d\n", sh_mem->total_readers);
+	printf("Total writers: %d\n", sh_mem->total_writers);
+	printf("Total records processed: %d\n", sh_mem->count_processes);
+	printf("Readers Average Time: %f\n", average_time_readers);
+	printf("Writers Average Time: %f\n", average_time_writers);
+	printf("Maximum time for a process: %f\n", max_time);
 
 	// Destroy semaphores
 	sem_destroy(&(sh_mem->sem_new_reader));
@@ -145,7 +167,7 @@ int main(int argc, char *argv[]) {
 
 	// Destroy shared memory segment
 	CHECK_CALL(err = shmctl(shmid, IPC_RMID, 0), -1);
-	printf("Removed shared memory segment %d\n\n", err);
+	printf("\nRemoved shared memory segment %d\n\n", shmid);
 
 	// Free memory
 	for (int i = 0; i < NUM_ARGS_READER - 1; i++) {

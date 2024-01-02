@@ -1,5 +1,0 @@
-./reader -f accounts50.bin -l 48 -d 0.45
-./reader -f accounts50.bin -l 10 -d 0.36
-./writer -f accounts50.bin -l 26 -v -76 -d 1.33
-./writer -f accounts50.bin -l 7 -v 67 -d 1.09
-./reader -f accounts50.bin -l 39 -d 0.9
