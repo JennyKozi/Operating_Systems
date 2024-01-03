@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 
 	// Create shared memory segment
 	CHECK_CALL(shmid = shmget(IPC_PRIVATE, sizeof(shared_mem_seg), SEGMENTPERM), -1);
-	printf("Allocated memory segment: %d\n\n", shmid);
+	printf("Allocated memory segment %d\n\n", shmid);
 
 	// Attach the segment
 	CHECK_CALL(sh_mem = shmat(shmid, (void *) 0, 0), (void *) -1);
@@ -30,7 +30,6 @@ int main(int argc, char *argv[]) {
 	sh_mem->total_readers = 0;
 	sh_mem->total_writers = 0;
 	sh_mem->total_recs_processed = 0;
-	sh_mem->count_processes = 0;
 
 	// Initialize the arrays
 	for (int i = 0; i < ARRAY_SIZE; i++) {
@@ -150,7 +149,7 @@ int main(int argc, char *argv[]) {
 	// Print statistics
 	printf("\nSTATISTICS:\nTotal readers: %d\n", sh_mem->total_readers);
 	printf("Total writers: %d\n", sh_mem->total_writers);
-	printf("Total records processed: %d\n", sh_mem->count_processes);
+	printf("Total records processed: %d\n", sh_mem->total_recs_processed);
 	printf("Readers Average Time: %f\n", average_time_readers);
 	printf("Writers Average Time: %f\n", average_time_writers);
 	printf("Maximum time for a process: %f\n", max_time);

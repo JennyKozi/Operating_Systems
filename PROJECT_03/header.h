@@ -32,7 +32,6 @@ typedef struct {
 	int total_readers;
 	int total_writers;
 	int total_recs_processed;
-	int count_processes;
 	int readers_recs[ARRAY_SIZE][2];
 	int writers_recs[ARRAY_SIZE];
 	double time_readers[ARRAY_SIZE];

@@ -95,7 +95,6 @@ void main (int argc, char *argv[]) {
 	sem_wait(&(sh_mem->mutex));
 	proc_index = sh_mem->total_readers; // Very important: variable proc_index indicates the index for the array of records for the readers
 	last_writer = sh_mem->total_writers; // The last writer that arrived before this process
-	sh_mem->count_processes++;
 	sh_mem->total_readers++; // Increase number of readers
 
 	// Insert the record id of this reader in the array
@@ -162,7 +161,7 @@ void main (int argc, char *argv[]) {
 	}
 	// Read one record
 	else {
-		sleep(rand() % max_time); // Sleep for some seconds while holding the record
+		sleep((rand() % max_time) + 1); // Sleep for some seconds while holding the record
 		read(rp, &rec, sizeof(Record));
 		printf("Reader %d: Record %d %s %s %d\n", pid, rec.customer_id, rec.last_name, rec.first_name, rec.balance);
 	}

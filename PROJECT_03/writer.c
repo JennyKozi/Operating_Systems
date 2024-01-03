@@ -61,7 +61,6 @@ void main (int argc, char *argv[]) {
 	sem_wait(&(sh_mem->mutex));
 	proc_index = sh_mem->total_writers; // Very important: variable proc_index indicates the index for the array of records for the writers
 	last_reader = sh_mem->total_readers; // The last reader that arrived before this process
-	sh_mem->count_processes++;
 	sh_mem->total_writers++; // Increase number of writers
 	sh_mem->writers_recs[proc_index] = recid; // Insert the record id of this writer in the array
 
@@ -124,7 +123,7 @@ void main (int argc, char *argv[]) {
 	new_balance = rec.balance + value;
 	rec.balance += value;
 	lseek(rp, (recid - 1) * sizeof(Record), SEEK_SET);
-	sleep(rand() % max_time); // Sleep for some seconds while holding the record
+	sleep((rand() % max_time) + 1); // Sleep for some seconds while holding the record
 	CHECK_CALL(write(rp, &rec, sizeof(Record)), -1);
 	printf("Writer %d: record id: %d, previous balance: %d, new balance: %d\n", pid, recid, prev_balance, new_balance);
 
