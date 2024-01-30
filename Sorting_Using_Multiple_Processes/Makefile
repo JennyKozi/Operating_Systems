@@ -27,10 +27,10 @@ clean: mysort
 	rm -rf mysort mysort.o merge.o selectionsort selectionsort.o bubblesort bubblesort.o
 
 run: mysort
-	./mysort -i voters500.bin -k 7 -e1 bubblesort -e2 selectionsort
+	./mysort -i data/voters500.bin -k 7 -e1 bubblesort -e2 selectionsort
 
 time: mysort
-	time ./mysort -i voters100000.bin -k 20 -e1 bubblesort -e2 selectionsort
+	time ./mysort -i data/voters100000.bin -k 20 -e1 bubblesort -e2 selectionsort
 
 valgrind: mysort
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./mysort -i voters50.bin -k 4 -e1 bubblesort -e2 selectionsort
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes --show-reachable=yes ./mysort -i data/voters50.bin -k 4 -e1 bubblesort -e2 selectionsort
