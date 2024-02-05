@@ -12,4 +12,16 @@ There's a limit to the number of readers or writers that we can have in total. T
 
 To run the program we need to provide an exec file in the command line arguments that will have the exec commands for every reader and writer that will be executed:
 
-./myprog exec2.txt
+## Run
+Use the Makefile to compile, run and clean using the following commands:
+
+```bash
+make 
+make run
+make clean
+```
+
+Other exec commands:
+```bash
+./myprog exec1.txt
+```
