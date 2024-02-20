@@ -1,4 +1,4 @@
-# Readers Writers Problem
+# Readers-Writers Problem
 
 A program that synchronizes many processes (readers and writers) using semaphores and a shared memory segment.
 
