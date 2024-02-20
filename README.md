@@ -1,6 +1,6 @@
 # Operating Systems
 
-Readers Writers
+Readers-Writers
 
 Multi-Processes Sorting
 
